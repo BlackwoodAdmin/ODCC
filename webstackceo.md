@@ -1,0 +1,2 @@
+## Architecture Overview
+The project is a full-stack web application comprising a React frontend and an Express.js backend. The frontend, initiated at `src/main.jsx`, provides user interfaces for content display (blog, events), user interaction (contact forms, donations), and a comprehensive dashboard for administrative and email management tasks. The backend, started from `server/index.js`, exposes a RESTful API to the frontend, handling data retrieval, user authentication, email operations, and AI

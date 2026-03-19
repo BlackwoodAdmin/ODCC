@@ -1,0 +1,48 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; }
+h1, h2, h3, h4 { font-family: 'Playfair Display', serif; }
+
+.hero-overlay {
+  background: linear-gradient(to bottom, rgba(60,56,40,0.55) 0%, rgba(60,56,40,0.75) 100%);
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-sage text-white px-6 py-3 rounded-lg font-semibold transition-all duration-300 shadow-md;
+  }
+  .btn-primary:hover {
+    @apply opacity-90 shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply border-2 border-cream text-cream px-6 py-3 rounded-lg font-semibold transition-all duration-300;
+  }
+  .btn-secondary:hover {
+    @apply bg-cream text-charcoal;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-md overflow-hidden transition-shadow duration-300;
+  }
+  .card:hover {
+    @apply shadow-xl;
+  }
+
+  .section-padding {
+    @apply py-16 px-4 md:py-24;
+  }
+
+  .container-custom {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  input:focus, textarea:focus, select:focus {
+    @apply outline-none ring-2 ring-sage ring-opacity-50;
+  }
+}
