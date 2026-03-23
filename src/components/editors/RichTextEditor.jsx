@@ -5,6 +5,8 @@ import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
+import TextStyle from '@tiptap/extension-text-style';
+import FontFamily from '@tiptap/extension-font-family';
 import api from '../../services/api';
 
 function ToolbarButton({ onClick, active, children, title }) {
@@ -17,6 +19,29 @@ function ToolbarButton({ onClick, active, children, title }) {
     >
       {children}
     </button>
+  );
+}
+
+function FontSizeDropdown({ editor }) {
+  const currentSize = editor.getAttributes('textStyle').fontSize || '16px';
+  
+  return (
+    <select
+      value={currentSize}
+      onChange={e => editor.chain().focus().setMark('textStyle', { fontSize: e.target.value }).run()}
+      title="Font Size"
+      className="px-2 py-1 rounded text-sm border border-gray-300 text-charcoal hover:bg-gray-100 transition-colors"
+    >
+      <option value="12px">12px</option>
+      <option value="14px">14px</option>
+      <option value="16px">16px</option>
+      <option value="18px">18px</option>
+      <option value="20px">20px</option>
+      <option value="24px">24px</option>
+      <option value="28px">28px</option>
+      <option value="32px">32px</option>
+      <option value="36px">36px</option>
+    </select>
   );
 }
 
@@ -87,6 +112,8 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       Underline,
       Link.configure({ openOnClick: false }),
       Image.configure({ inline: false }),
+      TextStyle,
+      FontFamily,
       Placeholder.configure({ placeholder }),
     ],
     content: value || '',
@@ -130,6 +157,8 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
         <ToolbarButton onClick={() => editor.chain().focus().toggleItalic().run()} active={editor.isActive('italic')} title="Italic"><em>I</em></ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleUnderline().run()} active={editor.isActive('underline')} title="Underline"><u>U</u></ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleStrike().run()} active={editor.isActive('strike')} title="Strikethrough"><s>S</s></ToolbarButton>
+        <span className="w-px h-5 bg-gray-300 mx-1" />
+        <FontSizeDropdown editor={editor} />
         <span className="w-px h-5 bg-gray-300 mx-1" />
         <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()} active={editor.isActive('heading', { level: 2 })} title="Heading 2">H2</ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()} active={editor.isActive('heading', { level: 3 })} title="Heading 3">H3</ToolbarButton>
