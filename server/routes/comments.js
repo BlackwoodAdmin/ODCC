@@ -11,7 +11,11 @@ router.get('/post/:slug', async (req, res) => {
     const post = await query('SELECT id FROM posts WHERE slug=$1', [req.params.slug]);
     if (!post.rows.length) return res.status(404).json({ error: 'Post not found' });
     const result = await query(
-      'SELECT id, post_id, author_name, content, created_at FROM comments WHERE post_id=$1 AND approved=true ORDER BY created_at DESC',
+      `SELECT c.id, c.post_id, c.author_name, c.content, c.created_at, u.profile_image
+       FROM comments c
+       LEFT JOIN users u ON c.author_email = u.email
+       WHERE c.post_id=$1 AND c.approved=true
+       ORDER BY c.created_at DESC`,
       [post.rows[0].id]
     );
     res.json({ comments: result.rows });

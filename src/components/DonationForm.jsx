@@ -96,7 +96,10 @@ export default function DonationForm() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (formRef.current) {
+      const top = formRef.current.getBoundingClientRect().top + window.scrollY - 110;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
   }, [step]);
 
   const handleTurnstileToken = useCallback((token) => setTurnstileToken(token), []);

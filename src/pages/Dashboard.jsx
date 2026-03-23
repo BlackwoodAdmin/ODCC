@@ -6,11 +6,17 @@ import useFetch from '../hooks/useFetch';
 export default function Dashboard() {
   const { user } = useAuth();
   const { data: stats } = useFetch('/dashboard/stats');
+  const { data: myDonations } = useFetch('/donations/my-donations');
+  const { data: myEmailAccounts } = useFetch('/email/my-accounts');
+
+  const myDonationCount = myDonations?.summary?.total_count || 0;
+  const hasEmailAccount = (myEmailAccounts?.accounts?.length ?? 0) > 0;
 
   const profileCard = { to: '/dashboard/profile', label: 'My Profile', count: null, icon: '👤', color: 'bg-slate-50 text-slate-600' };
   const directoryCard = { to: '/dashboard/directory', label: 'Church Directory', count: null, icon: '📖', color: 'bg-cyan-50 text-cyan-600' };
-  const donationCard = { to: '/dashboard/donations', label: 'My Donations', count: stats?.donations?.total || 0, icon: '💝', color: 'bg-rose-50 text-rose-600' };
+  const donationCard = { to: '/dashboard/donations', label: 'My Donations', count: myDonationCount, icon: '💝', color: 'bg-rose-50 text-rose-600' };
   const donationAdminCard = { to: '/dashboard/admin/donations', label: 'Donation Reports', count: null, icon: '📊', color: 'bg-emerald-50 text-emerald-600' };
+  const emailCard = { to: '/dashboard/email', label: 'Email', count: null, icon: '📧', color: 'bg-teal-50 text-teal-600' };
 
   const adminCards = [
     { to: '/dashboard/posts', label: 'Blog Posts', count: stats?.posts?.total || 0, icon: '📝', color: 'bg-blue-50 text-blue-600' },
@@ -19,7 +25,7 @@ export default function Dashboard() {
     { to: '/dashboard/messages', label: 'Messages', count: stats?.messages?.total || 0, unread: Number(stats?.messages?.unread) || 0, icon: '✉️', color: 'bg-orange-50 text-orange-600' },
     { to: '/dashboard/users', label: 'Users', count: stats?.users?.total || 0, icon: '👥', color: 'bg-pink-50 text-pink-600' },
     { to: '/dashboard/newsletter', label: 'Newsletter', count: null, icon: '📰', color: 'bg-amber-50 text-amber-600' },
-    { to: '/dashboard/email', label: 'Email', count: null, icon: '📧', color: 'bg-teal-50 text-teal-600' },
+    emailCard,
     { to: '/dashboard/admin/email', label: 'Email Admin', count: null, icon: '⚙️', color: 'bg-indigo-50 text-indigo-600' },
     donationCard,
     donationAdminCard,
@@ -27,9 +33,21 @@ export default function Dashboard() {
     profileCard,
   ];
 
-  const emailCard = { to: '/dashboard/email', label: 'Email', count: null, icon: '📧', color: 'bg-teal-50 text-teal-600' };
-  const contributorCards = [...adminCards.filter(c => ['/dashboard/posts', '/dashboard/events'].includes(c.to)), emailCard, donationCard, directoryCard, profileCard];
-  const subscriberCards = [emailCard, donationCard, directoryCard, profileCard];
+  const contributorCards = [
+    ...adminCards.filter(c => ['/dashboard/posts', '/dashboard/events'].includes(c.to)),
+    ...(hasEmailAccount ? [emailCard] : []),
+    donationCard,
+    directoryCard,
+    profileCard,
+  ];
+
+  const subscriberCards = [
+    ...(hasEmailAccount ? [emailCard] : []),
+    donationCard,
+    directoryCard,
+    profileCard,
+  ];
+
   const cards = user?.role === 'admin' ? adminCards : user?.role === 'contributor' ? contributorCards : subscriberCards;
 
   return (

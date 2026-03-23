@@ -11,6 +11,7 @@ export default function Header() {
   const [registerOpen, setRegisterOpen] = useState(false);
   const [prayerOpen, setPrayerOpen] = useState(false);
   const aboutRef = useRef(null);
+  const mobileAboutRef = useRef(null);
   const aboutTimeout = useRef(null);
 
   const navLinks = [
@@ -20,17 +21,12 @@ export default function Header() {
     { to: '/give', label: 'Give' },
   ];
 
-  const aboutLinks = [
-    { to: '/about', label: 'About Us' },
-    { to: '/joy-ladies-circle', label: 'J.O.Y. Ladies' },
-    { to: '/contact', label: 'Contact Us' },
-    { to: '/blog', label: 'Blog' },
-  ];
-
   // Close About dropdown on outside click
   useEffect(() => {
     const handleClick = (e) => {
-      if (aboutRef.current && !aboutRef.current.contains(e.target)) setAboutOpen(false);
+      const inDesktop = aboutRef.current && aboutRef.current.contains(e.target);
+      const inMobile = mobileAboutRef.current && mobileAboutRef.current.contains(e.target);
+      if (!inDesktop && !inMobile) setAboutOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -66,7 +62,7 @@ export default function Header() {
 
             <nav className="hidden lg:flex items-center gap-6">
               {navLinks.map(link => (
-                <NavLink key={link.to} to={link.to} className={linkClass} end={link.to === '/'}>{link.label}</NavLink>
+                <NavLink key={link.to} to={link.to} className={linkClass} end={link.to === '/'} >{link.label}</NavLink>
               ))}
 
               {/* About dropdown */}
@@ -80,16 +76,42 @@ export default function Header() {
                 </button>
                 {aboutOpen && (
                   <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-2 z-50">
-                    {aboutLinks.map(link => (
-                      <NavLink
-                        key={link.to}
-                        to={link.to}
-                        onClick={() => setAboutOpen(false)}
-                        className={({ isActive }) => `block px-4 py-2 text-sm transition-colors ${isActive ? 'text-sage bg-sage/5 font-medium' : 'text-charcoal hover:text-sage hover:bg-sage/5'}`}
+                    <NavLink
+                      to="/about"
+                      onClick={() => setAboutOpen(false)}
+                      className={({ isActive }) => `block px-4 py-2 text-sm transition-colors ${isActive ? 'text-sage bg-sage/5 font-medium' : 'text-charcoal hover:text-sage hover:bg-sage/5'}`}
+                    >
+                      About Us
+                    </NavLink>
+                    <NavLink
+                      to="/joy-ladies-circle"
+                      onClick={() => setAboutOpen(false)}
+                      className={({ isActive }) => `block px-4 py-2 text-sm transition-colors ${isActive ? 'text-sage bg-sage/5 font-medium' : 'text-charcoal hover:text-sage hover:bg-sage/5'}`}
+                    >
+                      J.O.Y. Ladies
+                    </NavLink>
+                    {!user && (
+                      <button
+                        onClick={() => { setAboutOpen(false); setRegisterOpen(true); }}
+                        className="block w-full text-left px-4 py-2 text-sm font-medium text-sage hover:bg-sage/5 transition-colors"
                       >
-                        {link.label}
-                      </NavLink>
-                    ))}
+                        Join Us
+                      </button>
+                    )}
+                    <NavLink
+                      to="/contact"
+                      onClick={() => setAboutOpen(false)}
+                      className={({ isActive }) => `block px-4 py-2 text-sm transition-colors ${isActive ? 'text-sage bg-sage/5 font-medium' : 'text-charcoal hover:text-sage hover:bg-sage/5'}`}
+                    >
+                      Contact Us
+                    </NavLink>
+                    <NavLink
+                      to="/blog"
+                      onClick={() => setAboutOpen(false)}
+                      className={({ isActive }) => `block px-4 py-2 text-sm transition-colors ${isActive ? 'text-sage bg-sage/5 font-medium' : 'text-charcoal hover:text-sage hover:bg-sage/5'}`}
+                    >
+                      Blog
+                    </NavLink>
                     <button
                       onClick={() => { setAboutOpen(false); setPrayerOpen(true); }}
                       className="block w-full text-left px-4 py-2 text-sm text-charcoal hover:text-sage hover:bg-sage/5 transition-colors"
@@ -124,11 +146,11 @@ export default function Header() {
             <nav className="lg:hidden pb-4 border-t border-gray-100 pt-4">
               <div className="flex flex-col gap-3">
                 {navLinks.map(link => (
-                  <NavLink key={link.to} to={link.to} className={linkClass} onClick={() => setMobileOpen(false)} end={link.to === '/'}>{link.label}</NavLink>
+                  <NavLink key={link.to} to={link.to} className={linkClass} onClick={() => setMobileOpen(false)} end={link.to === '/'} >{link.label}</NavLink>
                 ))}
 
                 {/* Mobile About submenu */}
-                <div>
+                <div ref={mobileAboutRef}>
                   <button
                     onClick={() => setAboutOpen(!aboutOpen)}
                     className={`font-medium transition-colors duration-200 flex items-center gap-1 w-full ${aboutIsActive ? 'text-sage' : 'text-charcoal hover:text-sage'}`}
@@ -138,9 +160,18 @@ export default function Header() {
                   </button>
                   {aboutOpen && (
                     <div className="ml-4 mt-2 flex flex-col gap-2">
-                      {aboutLinks.map(link => (
-                        <NavLink key={link.to} to={link.to} className={linkClass} onClick={() => { setMobileOpen(false); setAboutOpen(false); }}>{link.label}</NavLink>
-                      ))}
+                      <NavLink to="/about" className={linkClass} onClick={() => { setMobileOpen(false); setAboutOpen(false); }}>About Us</NavLink>
+                      <NavLink to="/joy-ladies-circle" className={linkClass} onClick={() => { setMobileOpen(false); setAboutOpen(false); }}>J.O.Y. Ladies</NavLink>
+                      {!user && (
+                        <button
+                          onClick={() => { setMobileOpen(false); setAboutOpen(false); setRegisterOpen(true); }}
+                          className="font-medium transition-colors duration-200 text-sage text-left"
+                        >
+                          Join Us
+                        </button>
+                      )}
+                      <NavLink to="/contact" className={linkClass} onClick={() => { setMobileOpen(false); setAboutOpen(false); }}>Contact Us</NavLink>
+                      <NavLink to="/blog" className={linkClass} onClick={() => { setMobileOpen(false); setAboutOpen(false); }}>Blog</NavLink>
                       <button
                         onClick={() => { setMobileOpen(false); setAboutOpen(false); setPrayerOpen(true); }}
                         className="font-medium transition-colors duration-200 text-charcoal hover:text-sage text-left"

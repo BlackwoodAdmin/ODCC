@@ -82,6 +82,7 @@ export async function initializeDatabase() {
       address VARCHAR(255) NOT NULL UNIQUE,
       display_name VARCHAR(255),
       user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      assigned_role VARCHAR(20),
       forwarding_address VARCHAR(255),
       forwarding_mode VARCHAR(20) DEFAULT 'none',
       signature_html TEXT,
@@ -349,6 +350,9 @@ export async function initializeDatabase() {
     if (!e.message.includes('already exists')) throw e;
   }
   try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image VARCHAR(500)'); } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+  }
+  try { await pool.query('ALTER TABLE email_accounts ADD COLUMN IF NOT EXISTS assigned_role VARCHAR(20)'); } catch (e) {
     if (!e.message.includes('already exists')) throw e;
   }
   // Allow NULL password_hash for newsletter-only subscribers

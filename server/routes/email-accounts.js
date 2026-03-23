@@ -20,14 +20,28 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 router.get('/my-accounts', authenticateToken, async (req, res) => {
   try {
-    const result = await query(
-      `SELECT ea.id, ea.address, ea.display_name, ea.forwarding_mode, ea.quota_mb, ea.used_mb,
-              ea.is_active, ea.auto_reply_allowed, ea.daily_send_limit, ea.signature_html
-       FROM email_accounts ea
-       WHERE ea.user_id = $1 AND ea.is_active = TRUE
-       ORDER BY ea.address`,
-      [req.user.id]
-    );
+    let result;
+    if (req.user.role === 'admin') {
+      // Admins get: accounts assigned to them specifically + accounts assigned to 'admin' role
+      result = await query(
+        `SELECT ea.id, ea.address, ea.display_name, ea.forwarding_mode, ea.quota_mb, ea.used_mb,
+                ea.is_active, ea.auto_reply_allowed, ea.daily_send_limit, ea.signature_html
+         FROM email_accounts ea
+         WHERE (ea.user_id = $1 OR ea.assigned_role = 'admin') AND ea.is_active = TRUE
+         ORDER BY ea.address`,
+        [req.user.id]
+      );
+    } else {
+      // Non-admins get only accounts assigned to them specifically
+      result = await query(
+        `SELECT ea.id, ea.address, ea.display_name, ea.forwarding_mode, ea.quota_mb, ea.used_mb,
+                ea.is_active, ea.auto_reply_allowed, ea.daily_send_limit, ea.signature_html
+         FROM email_accounts ea
+         WHERE ea.user_id = $1 AND ea.is_active = TRUE
+         ORDER BY ea.address`,
+        [req.user.id]
+      );
+    }
     res.json({ success: true, accounts: result.rows });
   } catch (err) {
     console.error('[Email] Failed to get user accounts:', err);
@@ -63,6 +77,7 @@ router.post('/accounts', authenticateToken, requireRole('admin'), async (req, re
       address,
       display_name,
       user_id,
+      assigned_role,
       forwarding_address,
       forwarding_mode,
       signature_html,
@@ -80,6 +95,11 @@ router.post('/accounts', authenticateToken, requireRole('admin'), async (req, re
     const normalizedAddress = address.trim().toLowerCase();
     if (!EMAIL_REGEX.test(normalizedAddress)) {
       return res.status(400).json({ error: 'Invalid email address format' });
+    }
+
+    // Validate that only one of user_id or assigned_role is set
+    if (user_id && assigned_role) {
+      return res.status(400).json({ error: 'Cannot assign to both a user and a role' });
     }
 
     // Check uniqueness against email_accounts
@@ -124,15 +144,16 @@ router.post('/accounts', authenticateToken, requireRole('admin'), async (req, re
 
     const result = await query(
       `INSERT INTO email_accounts
-        (address, display_name, user_id, forwarding_address, forwarding_mode,
+        (address, display_name, user_id, assigned_role, forwarding_address, forwarding_mode,
          signature_html, auto_reply_allowed, quota_mb, is_catch_all, is_active,
          daily_send_limit, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
        RETURNING *`,
       [
         normalizedAddress,
         display_name || null,
         user_id || null,
+        assigned_role || null,
         forwarding_address || null,
         forwarding_mode || 'none',
         signature_html || null,
@@ -177,6 +198,7 @@ router.put('/accounts/:id', authenticateToken, requireRole('admin'), async (req,
     const {
       display_name,
       user_id,
+      assigned_role,
       forwarding_address,
       forwarding_mode,
       signature_html,
@@ -194,6 +216,11 @@ router.put('/accounts/:id', authenticateToken, requireRole('admin'), async (req,
     }
 
     const current = existing.rows[0];
+
+    // Validate that only one of user_id or assigned_role is set
+    if (user_id && assigned_role) {
+      return res.status(400).json({ error: 'Cannot assign to both a user and a role' });
+    }
 
     // If enabling catch-all, check no other account has it
     if (is_catch_all && !current.is_catch_all) {
@@ -218,24 +245,39 @@ router.put('/accounts/:id', authenticateToken, requireRole('admin'), async (req,
 
     const now = Date.now();
 
+    // Determine final values for user_id and assigned_role
+    let finalUserId = current.user_id;
+    let finalAssignedRole = current.assigned_role;
+
+    if (user_id !== undefined) {
+      finalUserId = user_id || null;
+      finalAssignedRole = null; // Clear role when assigning to user
+    }
+    if (assigned_role !== undefined) {
+      finalAssignedRole = assigned_role || null;
+      finalUserId = null; // Clear user when assigning to role
+    }
+
     const result = await query(
       `UPDATE email_accounts SET
         display_name = COALESCE($1, display_name),
         user_id = $2,
-        forwarding_address = COALESCE($3, forwarding_address),
-        forwarding_mode = COALESCE($4, forwarding_mode),
-        signature_html = COALESCE($5, signature_html),
-        auto_reply_allowed = COALESCE($6, auto_reply_allowed),
-        quota_mb = COALESCE($7, quota_mb),
-        is_catch_all = COALESCE($8, is_catch_all),
-        is_active = COALESCE($9, is_active),
-        daily_send_limit = COALESCE($10, daily_send_limit),
-        updated_at = $11
-       WHERE id = $12
+        assigned_role = $3,
+        forwarding_address = COALESCE($4, forwarding_address),
+        forwarding_mode = COALESCE($5, forwarding_mode),
+        signature_html = COALESCE($6, signature_html),
+        auto_reply_allowed = COALESCE($7, auto_reply_allowed),
+        quota_mb = COALESCE($8, quota_mb),
+        is_catch_all = COALESCE($9, is_catch_all),
+        is_active = COALESCE($10, is_active),
+        daily_send_limit = COALESCE($11, daily_send_limit),
+        updated_at = $12
+       WHERE id = $13
        RETURNING *`,
       [
         display_name,
-        user_id !== undefined ? (user_id || null) : current.user_id,
+        finalUserId,
+        finalAssignedRole,
         forwarding_address,
         forwarding_mode,
         signature_html,

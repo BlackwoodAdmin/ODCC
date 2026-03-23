@@ -589,7 +589,8 @@ router.get('/accounts/:id/messages', async (req, res) => {
       const total = parseInt(countResult.rows[0].total, 10);
 
       const messagesResult = await query(
-        `SELECT DISTINCT ON (COALESCE(m.thread_id, m.message_id, m.id::text))
+        `SELECT * FROM (
+           SELECT DISTINCT ON (COALESCE(m.thread_id, m.message_id, m.id::text))
                 m.id, m.folder_id, m.message_id, m.thread_id,
                 m.from_address, m.from_name, m.to_addresses, m.cc_addresses,
                 m.subject, m.is_read, m.is_starred, m.is_draft, m.priority,
@@ -610,6 +611,8 @@ router.get('/accounts/:id/messages', async (req, res) => {
          WHERE ${where}
          ORDER BY COALESCE(m.thread_id, m.message_id, m.id::text),
                   COALESCE(m.received_at, m.created_at) DESC
+         ) threads
+         ORDER BY COALESCE(received_at, created_at) DESC
          LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
         [...params, limit, offset]
       );
