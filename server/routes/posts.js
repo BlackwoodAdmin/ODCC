@@ -72,7 +72,7 @@ router.post('/', authenticateToken, requireRole('admin','contributor'), upload.s
     const slug = customSlug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const image = req.file ? `/uploads/${req.file.filename}` : null;
     const now = Date.now();
-    const publishedAt = customPublishedAt ? parseInt(customPublishedAt) : (status === 'published' ? now : null);
+    const publishedAt = customPublishedAt && customPublishedAt !== '' ? parseInt(customPublishedAt) : (status === 'published' ? now : null);
     // Handle slug collisions by appending -2, -3, etc.
     let finalSlug = slug;
     const existing = await query('SELECT slug FROM posts WHERE slug LIKE $1', [slug + '%']);
@@ -107,7 +107,7 @@ router.put('/:id', authenticateToken, requireRole('admin','contributor'), upload
     let slug = customSlug || (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : post.rows[0].slug);
     const image = req.file ? `/uploads/${req.file.filename}` : post.rows[0].featured_image;
     const now = Date.now();
-    const publishedAt = customPublishedAt ? parseInt(customPublishedAt) : (status === 'published' && !post.rows[0].published_at ? now : post.rows[0].published_at);
+    const publishedAt = customPublishedAt && customPublishedAt !== '' ? parseInt(customPublishedAt) : (status === 'published' && !post.rows[0].published_at ? now : post.rows[0].published_at);
     
     // Only check for slug collisions if slug is being changed
     if (slug !== post.rows[0].slug) {
