@@ -40,7 +40,7 @@ export default function BlogPost() {
     <div>
       <section className="relative py-24 bg-charcoal text-white">
         <div className="container-custom text-center max-w-3xl">
-          <p className="text-sage text-sm font-medium mb-4">{formatDate(post.created_at)} · By {post.author_name}</p>
+          <p className="text-sage text-sm font-medium mb-4">{formatDate(post.published_at || post.created_at)} · By {post.author_name}</p>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">{post.title}</h1>
         </div>
       </section>

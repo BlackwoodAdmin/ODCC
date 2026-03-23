@@ -33,7 +33,7 @@ export default function Blog() {
                     </div>
                   )}
                   <div className="p-6">
-                    <p className="text-sage text-sm font-medium mb-2">{formatDate(post.created_at)} · By {post.author_name}</p>
+                    <p className="text-sage text-sm font-medium mb-2">{formatDate(post.published_at || post.created_at)} · By {post.author_name}</p>
                     <h3 className="text-xl font-bold text-charcoal mb-2 group-hover:text-sage transition-colors">{post.title}</h3>
                     <p className="text-gray-600 text-sm">{post.excerpt || post.content?.replace(/<[^>]*>/g, '').substring(0, 120)}...</p>
                   </div>

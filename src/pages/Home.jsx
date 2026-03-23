@@ -51,9 +51,9 @@ export default function Home() {
             <h2 className="text-4xl md:text-5xl font-bold text-charcoal mb-6">Welcome Home</h2>
             <div className="w-20 h-1 bg-sage mx-auto mb-8"></div>
             <p className="text-lg text-gray-600 leading-relaxed mb-6">
-              At Open Door Christian Church, you’ll find a warm, welcoming community rooted in God’s Word. 
+              At Open Door Christian Church, you'll find a warm, welcoming community rooted in God's Word. 
               Whether you join us in the chapel or from your car during our unique drive-in service, 
-              there’s a place here for you and your family.
+              there's a place here for you and your family.
             </p>
             <p className="text-lg text-gray-600 leading-relaxed mb-8">
               We celebrate communion every Sunday and gather throughout the week for fellowship, 
@@ -168,7 +168,7 @@ export default function Home() {
                     </div>
                   )}
                   <div className="p-6">
-                    <p className="text-sage text-sm font-medium mb-2">{formatDate(post.created_at)}</p>
+                    <p className="text-sage text-sm font-medium mb-2">{formatDate(post.published_at || post.created_at)}</p>
                     <h3 className="text-xl font-bold text-charcoal mb-2 group-hover:text-sage transition-colors">{post.title}</h3>
                     <p className="text-gray-600 text-sm">{post.excerpt?.substring(0, 100)}...</p>
                   </div>
