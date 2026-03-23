@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Helmet } from 'react-helmet-async';
 import { useParams, Link } from 'react-router-dom';
 import useFetch from '../hooks/useFetch';
 import useAuth from '../hooks/useAuth';
@@ -39,20 +38,6 @@ export default function BlogPost() {
 
   return (
     <div>
-      <Helmet>
-        <title>{post.title} - Open Door Christian Church</title>
-        <meta name="description" content={post.excerpt || post.title} />
-        <meta property="og:title" content={post.title} />
-        <meta property="og:description" content={post.excerpt || post.title} />
-        <meta property="og:image" content={post.featured_image || 'https://church.cloud.webstack.ceo/uploads/church-header.jpg'} />
-        <meta property="og:type" content="article" />
-        <meta property="og:url" content={`https://opendoorchristian.church/blog/${slug}`} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={post.title} />
-        <meta name="twitter:description" content={post.excerpt || post.title} />
-        <meta name="twitter:image" content={post.featured_image || 'https://church.cloud.webstack.ceo/uploads/church-header.jpg'} />
-      </Helmet>
-
       <section className="relative py-24 bg-charcoal text-white">
         <div className="container-custom text-center max-w-3xl">
           <p className="text-sage text-sm font-medium mb-4">{formatDate(post.published_at || post.created_at)} · By {post.author_name}</p>
