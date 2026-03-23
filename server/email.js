@@ -25,11 +25,11 @@ export async function sendEmail({ to, subject, html }) {
     return false;
   }
   try {
-    await sgMail.send({ to, from: { email: FROM_EMAIL, name: FROM_NAME }, subject, html });
-    console.log('[Email] Sent:', { to, subject });
+    const response = await sgMail.send({ to, from: { email: FROM_EMAIL, name: FROM_NAME }, subject, html });
+    console.log('[Email] Sent to:', to, 'Subject:', subject, 'Response:', response[0].statusCode);
     return true;
   } catch (err) {
-    console.error('[Email] Failed:', err?.response?.body || err.message);
+    console.error('[Email] Failed to send to', to, '— Error:', err?.response?.body?.errors || err.message);
     return false;
   }
 }
@@ -50,17 +50,19 @@ export async function sendNewsletter(personalizations, subject, bodyHtml, bodyTe
   const wrappedHtml = wrapEmailHtml(bodyHtml);
   const wrappedText = wrapEmailText(bodyText);
   try {
-    await sgMail.send({
+    const recipients = personalizations.map(p => p.to.map(t => t.email).join(',')).join(';');
+    console.log('[Email] Newsletter sending to:', recipients, 'Subject:', subject);
+    const response = await sgMail.send({
       personalizations,
       from: { email: FROM_EMAIL, name: FROM_NAME },
       subject,
       html: wrappedHtml,
       text: wrappedText,
     });
-    console.log(`[Email] Newsletter sent to ${personalizations.length} recipients`);
+    console.log(`[Email] Newsletter sent to ${personalizations.length} recipients. From: ${FROM_EMAIL}. Response: ${response[0].statusCode}`);
     return true;
   } catch (err) {
-    console.error('[Email] Newsletter send failed:', err?.response?.body || err.message);
+    console.error('[Email] Newsletter send failed from', FROM_EMAIL, '— Error:', err?.response?.body?.errors || err.message);
     return false;
   }
 }
