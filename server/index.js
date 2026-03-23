@@ -128,9 +128,9 @@ app.get('/blog/:slug', async (req, res) => {
     }
 
     const post = result.rows[0];
-    const siteUrl = 'https://opendoorchristian.church';
+    const siteUrl = 'https://church.cloud.webstack.ceo';
     const postUrl = `${siteUrl}/blog/${slug}`;
-    const ogImage = post.featured_image || `${siteUrl}/og-default.png`;
+    const ogImage = post.featured_image || `${siteUrl}/uploads/church-header.jpg`;
     const ogTitle = escapeHtml(post.title || 'Blog Post');
     const ogDescription = escapeHtml(post.excerpt || 'Read this post');
 
@@ -150,6 +150,7 @@ app.get('/blog/:slug', async (req, res) => {
   <meta property="og:title" content="${ogTitle}" />
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
+  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${postUrl}" />
   
