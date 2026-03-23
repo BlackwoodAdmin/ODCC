@@ -132,12 +132,23 @@ app.get('/blog/:slug', async (req, res) => {
     const postUrl = `${siteUrl}/blog/${slug}`;
     
     // Ensure og:image is always an absolute URL
-    let ogImage = `${siteUrl}/uploads/church-header.jpg`;
+    let ogImage = `${siteUrl}/uploads/church-header.webp`;
+    let ogImageType = 'image/webp';
     if (post.featured_image) {
       if (post.featured_image.startsWith('http')) {
         ogImage = post.featured_image;
       } else {
         ogImage = `${siteUrl}${post.featured_image}`;
+      }
+      // Detect image type from featured_image extension
+      if (post.featured_image.endsWith('.jpg') || post.featured_image.endsWith('.jpeg')) {
+        ogImageType = 'image/jpeg';
+      } else if (post.featured_image.endsWith('.png')) {
+        ogImageType = 'image/png';
+      } else if (post.featured_image.endsWith('.gif')) {
+        ogImageType = 'image/gif';
+      } else {
+        ogImageType = 'image/webp';
       }
     }
     
@@ -160,7 +171,7 @@ app.get('/blog/:slug', async (req, res) => {
   <meta property="og:title" content="${ogTitle}" />
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
-  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:type" content="${ogImageType}" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${postUrl}" />
   
