@@ -72,11 +72,15 @@ function expandRecurringEvents(events, startDate, endDate) {
         if (m > 11) { m = 0; y++; }
       }
     } else {
-      const eventDate = new Date(event.event_date);
+      // One-time event: extract just the date part and compare
+      const eventDateStr = event.event_date instanceof Date 
+        ? fmtDate(event.event_date)
+        : String(event.event_date).split('T')[0];
+      const eventDate = new Date(eventDateStr + 'T12:00:00');
       if (eventDate >= start && eventDate <= end) {
         expanded.push({
           ...event,
-          event_date: fmtDate(eventDate),
+          event_date: eventDateStr,
         });
       }
     }
@@ -124,7 +128,7 @@ router.get('/', async (req, res) => {
       `SELECT e.*, u.name as author_name FROM events e
        JOIN users u ON e.author_id=u.id
        WHERE e.recurrence IN ('weekly', 'monthly')
-          OR (e.event_date >= $1 AND e.event_date <= $2)
+          OR (DATE(e.event_date) >= $1::date AND DATE(e.event_date) <= $2::date)
        ORDER BY e.event_date ASC`,
       [startStr, endStr]
     );
