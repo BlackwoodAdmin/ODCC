@@ -1,2 +1,2 @@
 ## Architecture Overview
-This is a fullstack application featuring a React frontend located in `src/` and a Node.js/Express backend within `server/`. The frontend is responsible for user interface and interaction, consuming data from the backend's RESTful API. The backend manages a PostgreSQL
+This project is a full-stack web application. The frontend, built with React and Vite in the `src/` directory, provides the user interface and interacts with the backend via RESTful APIs. The backend, an Express.js server located in the `server/

@@ -8,6 +8,22 @@ import { formatDate } from '../utils/formatters';
 const RichTextEditor = lazy(() => import('../components/editors/RichTextEditor'));
 const AiAssistant = lazy(() => import('../components/editors/AiAssistant'));
 
+const formatTimestampToDateTime = (timestamp) => {
+  if (!timestamp) return '';
+  const date = new Date(Number(timestamp));
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+const parseDateTimeToTimestamp = (dateTimeStr) => {
+  if (!dateTimeStr) return null;
+  return new Date(dateTimeStr).getTime();
+};
+
 export default function DashboardPosts() {
   const { user } = useAuth();
   const { notify } = useNotification();
@@ -15,7 +31,7 @@ export default function DashboardPosts() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: '', content: '', excerpt: '', slug: '', status: 'published' });
+  const [form, setForm] = useState({ title: '', content: '', excerpt: '', slug: '', status: 'published', published_at: null });
   const [imageFile, setImageFile] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [showAi, setShowAi] = useState(false);
@@ -75,6 +91,7 @@ export default function DashboardPosts() {
       formData.append('excerpt', form.excerpt);
       formData.append('slug', form.slug);
       formData.append('status', form.status);
+      if (form.published_at) formData.append('published_at', form.published_at);
       if (imageFile) formData.append('image', imageFile);
 
       if (editing) {
@@ -99,14 +116,21 @@ export default function DashboardPosts() {
   };
 
   const editPost = (post) => {
-    setForm({ title: post.title, content: post.content, excerpt: post.excerpt || '', slug: post.slug || '', status: post.status });
+    setForm({
+      title: post.title,
+      content: post.content,
+      excerpt: post.excerpt || '',
+      slug: post.slug || '',
+      status: post.status,
+      published_at: post.published_at ? parseFloat(post.published_at) : null
+    });
     setEditing(post.id);
     setShowForm(true);
     setDirty(false);
   };
 
   const resetForm = () => {
-    setForm({ title: '', content: '', excerpt: '', slug: '', status: 'published' });
+    setForm({ title: '', content: '', excerpt: '', slug: '', status: 'published', published_at: null });
     setEditing(null);
     setShowForm(false);
     setImageFile(null);
@@ -178,8 +202,19 @@ export default function DashboardPosts() {
                   <input type="file" accept="image/*" onChange={e => setImageFile(e.target.files[0])} className="w-full text-sm" />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-charcoal mb-2">Publish Date</label>
+                  <input
+                    type="datetime-local"
+                    value={formatTimestampToDateTime(form.published_at)}
+                    onChange={e => { setForm({ ...form, published_at: parseDateTimeToTimestamp(e.target.value) }); setDirty(true); }}
+                    className="w-full border border-gray-200 rounded-lg px-4 py-3"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
                   <label className="block text-sm font-medium text-charcoal mb-2">Status</label>
-                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="w-full border border-gray-200 rounded-lg px-4 py-3">
+                  <select value={form.status} onChange={e => { setForm({ ...form, status: e.target.value }); setDirty(true); }} className="w-full border border-gray-200 rounded-lg px-4 py-3">
                     <option value="published">Published</option>
                     <option value="draft">Draft</option>
                   </select>

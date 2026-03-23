@@ -67,12 +67,12 @@ router.get('/:slug', async (req, res) => {
 
 router.post('/', authenticateToken, requireRole('admin','contributor'), upload.single('image'), async (req, res) => {
   try {
-    const { title, content, excerpt, status = 'draft', slug: customSlug } = req.body;
+    const { title, content, excerpt, status = 'draft', slug: customSlug, published_at: customPublishedAt } = req.body;
     const cleanContent = sanitizeHtml(content, SANITIZE_OPTIONS);
     const slug = customSlug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const image = req.file ? `/uploads/${req.file.filename}` : null;
     const now = Date.now();
-    const publishedAt = status === 'published' ? now : null;
+    const publishedAt = customPublishedAt ? parseInt(customPublishedAt) : (status === 'published' ? now : null);
     // Handle slug collisions by appending -2, -3, etc.
     let finalSlug = slug;
     const existing = await query('SELECT slug FROM posts WHERE slug LIKE $1', [slug + '%']);
@@ -102,12 +102,12 @@ router.put('/:id', authenticateToken, requireRole('admin','contributor'), upload
     const post = await query('SELECT * FROM posts WHERE id=$1', [req.params.id]);
     if (!post.rows.length) return res.status(404).json({ error: 'Post not found' });
     if (req.user.role !== 'admin' && post.rows[0].author_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
-    const { title, content, excerpt, status, slug: customSlug } = req.body;
+    const { title, content, excerpt, status, slug: customSlug, published_at: customPublishedAt } = req.body;
     const cleanContent = content ? sanitizeHtml(content, SANITIZE_OPTIONS) : post.rows[0].content;
     let slug = customSlug || (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : post.rows[0].slug);
     const image = req.file ? `/uploads/${req.file.filename}` : post.rows[0].featured_image;
     const now = Date.now();
-    const publishedAt = status === 'published' && !post.rows[0].published_at ? now : post.rows[0].published_at;
+    const publishedAt = customPublishedAt ? parseInt(customPublishedAt) : (status === 'published' && !post.rows[0].published_at ? now : post.rows[0].published_at);
     
     // Only check for slug collisions if slug is being changed
     if (slug !== post.rows[0].slug) {
