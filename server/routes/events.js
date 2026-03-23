@@ -15,10 +15,6 @@ function fmtDate(d) {
   return `${y}-${m}-${day}`;
 }
 
-/**
- * Find the Nth occurrence of a given day_of_week in a month.
- * Returns null if that occurrence doesn't exist (e.g. 5th Saturday).
- */
 function getNthDayOfMonth(year, month, dayOfWeek, n) {
   const first = new Date(year, month, 1);
   let day = 1 + ((dayOfWeek - first.getDay() + 7) % 7);
@@ -28,16 +24,10 @@ function getNthDayOfMonth(year, month, dayOfWeek, n) {
   return result;
 }
 
-/**
- * Expand recurring events into individual occurrences for a date range.
- * Weekly events repeat on their day_of_week every week.
- * Monthly events repeat on the Nth day_of_week of every month
- * (e.g. "1st Saturday" each month).
- */
 function expandRecurringEvents(events, startDate, endDate) {
   const expanded = [];
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  const start = new Date(startDate + 'T00:00:00Z');
+  const end = new Date(endDate + 'T23:59:59Z');
 
   for (const event of events) {
     if (event.recurrence === 'weekly' && event.day_of_week !== null) {
@@ -54,7 +44,6 @@ function expandRecurringEvents(events, startDate, endDate) {
         d.setDate(d.getDate() + 7);
       }
     } else if (event.recurrence === 'monthly' && event.day_of_week !== null && event.week_of_month !== null) {
-      // Iterate each month in the range
       let y = start.getFullYear();
       let m = start.getMonth();
       const endY = end.getFullYear();
@@ -72,11 +61,10 @@ function expandRecurringEvents(events, startDate, endDate) {
         if (m > 11) { m = 0; y++; }
       }
     } else {
-      // One-time event: extract just the date part and compare
       const eventDateStr = event.event_date instanceof Date 
         ? fmtDate(event.event_date)
         : String(event.event_date).split('T')[0];
-      const eventDate = new Date(eventDateStr + 'T12:00:00');
+      const eventDate = new Date(eventDateStr + 'T12:00:00Z');
       if (eventDate >= start && eventDate <= end) {
         expanded.push({
           ...event,
@@ -102,7 +90,6 @@ router.get('/', async (req, res) => {
     let startStr, endStr;
 
     if (days) {
-      // Upcoming mode: from today (ET) for N days
       const today = todayET();
       const startDate = new Date(today + 'T00:00:00');
       const endDate = new Date(startDate);
@@ -110,7 +97,6 @@ router.get('/', async (req, res) => {
       startStr = today;
       endStr = fmtDate(endDate);
     } else {
-      // Calendar mode: full month with surrounding partial weeks
       const now = new Date();
       const m = parseInt(month) || (now.getMonth() + 1);
       const y = parseInt(year) || now.getFullYear();
@@ -124,6 +110,8 @@ router.get('/', async (req, res) => {
       endStr = fmtDate(endDate);
     }
 
+    console.error(`[Events] Fetching for range ${startStr} to ${endStr}`);
+
     const result = await query(
       `SELECT e.*, u.name as author_name FROM events e
        JOIN users u ON e.author_id=u.id
@@ -133,7 +121,11 @@ router.get('/', async (req, res) => {
       [startStr, endStr]
     );
 
+    console.error(`[Events] Query returned ${result.rows.length} rows`);
+    result.rows.forEach(r => console.error(`[Events] - ID ${r.id}: ${r.title} on ${r.event_date} (recurrence: ${r.recurrence})`));
+
     const expanded = expandRecurringEvents(result.rows, startStr, endStr);
+    console.error(`[Events] After expansion: ${expanded.length} events`);
     res.json({ events: expanded });
   } catch (err) {
     console.error('Events fetch error:', err);
