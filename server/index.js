@@ -130,7 +130,17 @@ app.get('/blog/:slug', async (req, res) => {
     const post = result.rows[0];
     const siteUrl = 'https://church.cloud.webstack.ceo';
     const postUrl = `${siteUrl}/blog/${slug}`;
-    const ogImage = post.featured_image || `${siteUrl}/uploads/church-header.jpg`;
+    
+    // Ensure og:image is always an absolute URL
+    let ogImage = `${siteUrl}/uploads/church-header.jpg`;
+    if (post.featured_image) {
+      if (post.featured_image.startsWith('http')) {
+        ogImage = post.featured_image;
+      } else {
+        ogImage = `${siteUrl}${post.featured_image}`;
+      }
+    }
+    
     const ogTitle = escapeHtml(post.title || 'Blog Post');
     const ogDescription = escapeHtml(post.excerpt || 'Read this post');
 
