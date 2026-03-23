@@ -6,7 +6,6 @@ import Link from '@tiptap/extension-link';
 import Image from '@tiptap/extension-image';
 import Placeholder from '@tiptap/extension-placeholder';
 import TextStyle from '@tiptap/extension-text-style';
-import FontFamily from '@tiptap/extension-font-family';
 import api from '../../services/api';
 
 function ToolbarButton({ onClick, active, children, title }) {
@@ -113,7 +112,6 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       Link.configure({ openOnClick: false }),
       Image.configure({ inline: false }),
       TextStyle,
-      FontFamily,
       Placeholder.configure({ placeholder }),
     ],
     content: value || '',
