@@ -1,206 +1,11 @@
 import { Router } from 'express';
 import crypto from 'crypto';
 import sgMail from '@sendgrid/mail';
-import sanitizeHtml from 'sanitize-html';
-import { query, pool } from '../db.js';
-import { sendEmail } from '../email.js';
-import { processAutoReply } from './email-inbound.js';
-import { wrapOutboundEmailHtml } from '../data/email-template-wrapper.js';
+import { query } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { emailLog } from '../utils/email-log.js';
 
 const router = Router();
-
-
-// ── Local delivery constants ─────────────────────────────────────────────────
-const LOCAL_DOMAINS = (process.env.LOCAL_EMAIL_DOMAINS || 'opendoorchristian.church')
-  .split(',').map(d => d.trim().toLowerCase()).filter(Boolean);
-
-const SANITIZE_OPTIONS = {
-  allowedTags: sanitizeHtml.defaults.allowedTags.concat([
-    'img', 'style', 'span', 'div', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
-    'caption', 'colgroup', 'col', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'br', 'hr',
-    'center', 'font',
-  ]),
-  allowedAttributes: {
-    ...sanitizeHtml.defaults.allowedAttributes,
-    '*': ['style', 'class', 'id', 'dir', 'align', 'valign', 'width', 'height', 'bgcolor'],
-    img: ['src', 'alt', 'width', 'height', 'style', 'class'],
-    a: ['href', 'target', 'rel', 'style', 'class'],
-    font: ['color', 'size', 'face'],
-    td: ['colspan', 'rowspan', 'style', 'width', 'height', 'align', 'valign', 'bgcolor'],
-    th: ['colspan', 'rowspan', 'style', 'width', 'height', 'align', 'valign', 'bgcolor'],
-    table: ['border', 'cellpadding', 'cellspacing', 'style', 'width', 'height', 'align', 'bgcolor'],
-  },
-  allowedSchemes: ['http', 'https', 'mailto'],
-  allowVulnerableTags: true,
-};
-
-const LOCAL_RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000;
-const LOCAL_RATE_LIMIT_MAX = 100;
-const MAX_HTML_BYTES = 1024 * 1024;
-
-/** Extract unique lowercase email strings from to/cc/bcc arrays. */
-function extractAllRecipientEmails(toAddrs, ccAddrs, bccAddrs) {
-  const all = [];
-  for (const list of [toAddrs, ccAddrs, bccAddrs]) {
-    if (!Array.isArray(list)) continue;
-    for (const r of list) {
-      if (!r) continue;
-      let email = typeof r === 'string' ? r : (r.address || r.email || null);
-      if (!email || typeof email !== 'string') continue;
-      const normalized = email.toLowerCase().trim();
-      if (normalized.includes('@')) all.push(normalized);
-    }
-  }
-  return [...new Set(all)];
-}
-
-async function areAllRecipientsLocal(toAddrs, ccAddrs, bccAddrs) {
-  const all = extractAllRecipientEmails(toAddrs, ccAddrs, bccAddrs);
-  if (all.length === 0) return false;
-  if (all.some(addr => !LOCAL_DOMAINS.includes((addr.split('@')[1] || '').toLowerCase()))) return false;
-  const acctRes = await query(
-    'SELECT LOWER(address) AS addr FROM email_accounts WHERE LOWER(address) = ANY($1) AND is_active = TRUE',
-    [all]
-  );
-  const found = new Set(acctRes.rows.map(r => r.addr));
-  const notFound = all.filter(a => !found.has(a));
-  if (notFound.length > 0) {
-    const aliasRes = await query(
-      `SELECT LOWER(al.alias_address) AS addr FROM email_aliases al
-       JOIN email_accounts ea ON ea.id = al.account_id
-       WHERE LOWER(al.alias_address) = ANY($1) AND ea.is_active = TRUE`,
-      [notFound]
-    );
-    for (const row of aliasRes.rows) found.add(row.addr);
-  }
-  return all.every(addr => found.has(addr));
-}
-
-function sanitizeAndWrapHtml(bodyHtml, senderName, senderAddress) {
-  if (!bodyHtml) return bodyHtml;
-  let result = sanitizeHtml(bodyHtml, SANITIZE_OPTIONS);
-  result = wrapOutboundEmailHtml(result, { senderName, senderAddress });
-  if (Buffer.byteLength(result, 'utf8') > MAX_HTML_BYTES) result = result.slice(0, MAX_HTML_BYTES);
-  return result;
-}
-
-async function resolveRecipientAccount(address) {
-  const addr = address.toLowerCase();
-  let res = await query('SELECT * FROM email_accounts WHERE LOWER(address) = $1 AND is_active = TRUE', [addr]);
-  if (res.rows.length) return res.rows[0];
-  res = await query(
-    `SELECT ea.* FROM email_accounts ea JOIN email_aliases al ON al.account_id = ea.id
-     WHERE LOWER(al.alias_address) = $1 AND ea.is_active = TRUE`, [addr]);
-  if (res.rows.length) return res.rows[0];
-  res = await query('SELECT * FROM email_accounts WHERE is_catch_all = TRUE AND is_active = TRUE LIMIT 1');
-  return res.rows.length ? res.rows[0] : null;
-}
-
-async function deliverLocally(msg, senderAccount) {
-  const allAddrs = extractAllRecipientEmails(msg.to_addresses, msg.cc_addresses, msg.bcc_addresses);
-  if (allAddrs.length === 0) return { successCount: 0, failureCount: 0, errors: [] };
-  const deliveryHtml = sanitizeAndWrapHtml(msg.body_html, msg.from_name || senderAccount.display_name || null, msg.from_address);
-  const sizeBytes = msg.size_bytes || 0;
-  const now = Date.now();
-  const messageId = msg.message_id || `<${crypto.randomUUID()}@${LOCAL_DOMAINS[0]}>`;
-  const processedAccounts = new Set();
-  processedAccounts.add(senderAccount.id);
-  const results = { successCount: 0, failureCount: 0, errors: [] };
-
-  for (const addr of allAddrs) {
-    try {
-      const recipientAccount = await resolveRecipientAccount(addr);
-      if (!recipientAccount) { results.errors.push({ address: addr, error: 'Account not found' }); results.failureCount++; continue; }
-      if (processedAccounts.has(recipientAccount.id)) continue;
-      processedAccounts.add(recipientAccount.id);
-
-      const windowStart = now - LOCAL_RATE_LIMIT_WINDOW_MS;
-      const rateRes = await query(
-        `SELECT COUNT(*)::int AS cnt FROM email_messages WHERE account_id = $1 AND direction = 'inbound' AND received_at > $2`,
-        [recipientAccount.id, windowStart]);
-      if (rateRes.rows[0].cnt >= LOCAL_RATE_LIMIT_MAX) {
-        await emailLog('warn', 'rate_limit_local', 'Local delivery rate limit exceeded', { account_id: recipientAccount.id });
-        results.errors.push({ address: addr, error: 'Rate limit exceeded' }); results.failureCount++; continue;
-      }
-
-      if (messageId) {
-        const dupRes = await query('SELECT id FROM email_messages WHERE account_id = $1 AND message_id = $2', [recipientAccount.id, messageId]);
-        if (dupRes.rows.length) { await emailLog('info', 'dedup_local', 'Duplicate message_id', { account_id: recipientAccount.id }); continue; }
-      }
-
-      let folderRes = await query("SELECT id FROM email_folders WHERE account_id = $1 AND name = 'Inbox'", [recipientAccount.id]);
-      if (!folderRes.rows.length) {
-        folderRes = await query(
-          `INSERT INTO email_folders (account_id, name, type, sort_order, created_at) VALUES ($1, 'Inbox', 'inbox', 0, $2) RETURNING id`,
-          [recipientAccount.id, now]);
-      }
-      const folderId = folderRes.rows[0].id;
-
-      const newSizeMb = sizeBytes / (1024 * 1024);
-      const usedMb = parseFloat(recipientAccount.used_mb) || 0;
-      const quotaMb = recipientAccount.quota_mb || 500;
-      if (usedMb + newSizeMb > quotaMb) {
-        await emailLog('warn', 'quota_local', 'Quota exceeded, skipping local delivery', { account_id: recipientAccount.id });
-        results.errors.push({ address: addr, error: 'Quota exceeded' }); results.failureCount++; continue;
-      }
-
-      const txClient = await pool.connect();
-      let messageDbId;
-      try {
-        await txClient.query('BEGIN ISOLATION LEVEL SERIALIZABLE');
-        const insertRes = await txClient.query(
-          `INSERT INTO email_messages (
-            account_id, folder_id, message_id, in_reply_to, references_header,
-            thread_id, from_address, from_name, to_addresses, cc_addresses, bcc_addresses,
-            subject, body_text, body_html, is_read, spam_score, direction,
-            size_bytes, received_at, created_at, updated_at
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
-          [
-            recipientAccount.id, folderId, messageId,
-            msg.in_reply_to || null, msg.references_header || null,
-            msg.thread_id || messageId,
-            msg.from_address, msg.from_name || null,
-            JSON.stringify(msg.to_addresses || []),
-            JSON.stringify(msg.cc_addresses || []),
-            JSON.stringify(msg.bcc_addresses || []),
-            msg.subject || '(no subject)', msg.body_text || null, deliveryHtml,
-            false, 0, 'inbound', sizeBytes, now, now, now,
-          ]);
-        messageDbId = insertRes.rows[0].id;
-        await txClient.query('UPDATE email_accounts SET used_mb = used_mb + $1, updated_at = $2 WHERE id = $3', [newSizeMb, now, recipientAccount.id]);
-        if (msg.from_address) {
-          await txClient.query(
-            `INSERT INTO email_contacts (account_id, email, name, created_at, updated_at) VALUES ($1,$2,$3,$4,$5)
-             ON CONFLICT (account_id, email) DO UPDATE SET name = COALESCE(NULLIF(EXCLUDED.name,''), email_contacts.name), updated_at = EXCLUDED.updated_at`,
-            [recipientAccount.id, msg.from_address.toLowerCase(), msg.from_name || null, now, now]);
-        }
-        await txClient.query('COMMIT');
-        results.successCount++;
-        await emailLog('info', 'local_delivery', 'Message delivered locally', { message_db_id: messageDbId, account_id: recipientAccount.id, from: msg.from_address, to: addr });
-      } catch (txErr) {
-        try { await txClient.query('ROLLBACK'); } catch (_) {}
-        throw txErr;
-      } finally { txClient.release(); }
-
-      if (recipientAccount.forwarding_address && recipientAccount.forwarding_mode !== 'none') {
-        sendEmail({ to: recipientAccount.forwarding_address, subject: `Fwd: ${msg.subject || '(no subject)'}`, html: deliveryHtml || `<pre>${msg.body_text || ''}</pre>` })
-          .then(() => emailLog('info', 'forward_local', 'Forwarded locally-delivered email', { account_id: recipientAccount.id }))
-          .catch(fwdErr => emailLog('error', 'forward_local', 'Forwarding failed (non-critical)', { account_id: recipientAccount.id, error: fwdErr.message }));
-      }
-      if (recipientAccount.auto_reply_enabled && msg.from_address) {
-        processAutoReply(recipientAccount, msg.from_address, null, now)
-          .then(() => emailLog('info', 'auto_reply_local', 'Auto-reply triggered', { account_id: recipientAccount.id }))
-          .catch(arErr => emailLog('error', 'auto_reply_local', 'Auto-reply failed (non-critical)', { account_id: recipientAccount.id, error: arErr.message }));
-      }
-    } catch (err) {
-      await emailLog('error', 'local_delivery', `Local delivery failed for ${addr}`, { error: err.message });
-      results.errors.push({ address: addr, error: err.message }); results.failureCount++;
-    }
-  }
-  return results;
-}
 
 // ── Module-level pending-send map ────────────────────────────────────────────
 // Maps messageId → setTimeout handle so cancel-send can clear it.
@@ -399,59 +204,34 @@ async function executeSend(messageId, accountId, userId, ip) {
     return;
   }
 
-  // Fetch account first (before ensureSendGrid check)
+  if (!ensureSendGrid()) {
+    await query(
+      "UPDATE email_messages SET send_status = 'failed', send_error = $1, updated_at = $2 WHERE id = $3",
+      ['SendGrid API key not configured', Date.now(), messageId]
+    );
+    await emailLog('error', 'outbound', 'SendGrid not configured', { messageId });
+    pendingSends.delete(messageId);
+    return;
+  }
+
   const acctResult = await query('SELECT * FROM email_accounts WHERE id = $1', [accountId]);
-  if (!acctResult.rows.length) { pendingSends.delete(messageId); return; }
+  if (!acctResult.rows.length) {
+    pendingSends.delete(messageId);
+    return;
+  }
   const account = acctResult.rows[0];
 
-  // Extract recipient addresses
+  // Build SendGrid message
   const toAddrs = (msg.to_addresses || []).map(r => (typeof r === 'string' ? r : r.address || r.email)).filter(Boolean);
   const ccAddrs = (msg.cc_addresses || []).map(r => (typeof r === 'string' ? r : r.address || r.email)).filter(Boolean);
   const bccAddrs = (msg.bcc_addresses || []).map(r => (typeof r === 'string' ? r : r.address || r.email)).filter(Boolean);
-
-  // ── Local delivery path ───────────────────────────────────────────────────
-  const allLocal = await areAllRecipientsLocal(msg.to_addresses, msg.cc_addresses, msg.bcc_addresses);
-  if (allLocal) {
-    try {
-      const localResults = await deliverLocally(msg, account);
-      const now = Date.now();
-      if (localResults.failureCount > 0 && localResults.successCount === 0) {
-        const errSummary = localResults.errors.map(e => `${e.address}: ${e.error}`).join('; ');
-        await query("UPDATE email_messages SET send_status = 'failed', send_error = $1, updated_at = $2 WHERE id = $3", [errSummary, now, messageId]);
-        await emailLog('error', 'local_delivery', 'All local deliveries failed', { messageId, errors: localResults.errors });
-        pendingSends.delete(messageId); return;
-      }
-      const sentFolderId = await getSentFolderId(accountId);
-      await query(`UPDATE email_messages SET send_status = 'sent', sent_at = $1, folder_id = $2, is_draft = FALSE, updated_at = $3 WHERE id = $4`, [now, sentFolderId, now, messageId]);
-      await query('UPDATE email_accounts SET daily_send_count = daily_send_count + 1, updated_at = $1 WHERE id = $2', [now, accountId]);
-      const allRecipients = collectAllRecipients(msg.to_addresses, msg.cc_addresses, msg.bcc_addresses);
-      await autoCollectContacts(accountId, allRecipients);
-      await auditLog(accountId, userId, 'send', messageId, { to: toAddrs, subject: msg.subject, delivery_method: 'local', successCount: localResults.successCount }, ip);
-      await emailLog('info', 'local_delivery', `Message delivered locally: ${msg.subject}`, { messageId, to: toAddrs });
-    } catch (localErr) {
-      const now = Date.now();
-      await query("UPDATE email_messages SET send_status = 'failed', send_error = $1, updated_at = $2 WHERE id = $3", [localErr.message, now, messageId]);
-      await emailLog('error', 'local_delivery', `Local delivery threw: ${localErr.message}`, { messageId });
-    }
-    pendingSends.delete(messageId); return;
-  }
-
-  // ── SendGrid path (any external recipient) ────────────────────────────────
-  if (!ensureSendGrid()) {
-    await query("UPDATE email_messages SET send_status = 'failed', send_error = $1, updated_at = $2 WHERE id = $3", ['SendGrid API key not configured', Date.now(), messageId]);
-    await emailLog('error', 'outbound', 'SendGrid not configured', { messageId });
-    pendingSends.delete(messageId); return;
-  }
-
-  // Sanitize and wrap HTML before sending via SendGrid
-  const wrappedHtml = msg.body_html ? sanitizeAndWrapHtml(msg.body_html, account.display_name || null, account.address) : null;
 
   const sgMsg = {
     to: toAddrs,
     from: { email: account.address, name: account.display_name || account.address },
     replyTo: { email: account.address, name: account.display_name || account.address },
     subject: msg.subject || '(no subject)',
-    ...(wrappedHtml ? { html: wrappedHtml } : {}),
+    ...(msg.body_html ? { html: msg.body_html } : {}),
     ...(msg.body_text ? { text: msg.body_text } : {}),
     headers: {},
   };
@@ -503,7 +283,7 @@ async function executeSend(messageId, accountId, userId, ip) {
     const allRecipients = collectAllRecipients(msg.to_addresses, msg.cc_addresses, msg.bcc_addresses);
     await autoCollectContacts(accountId, allRecipients);
 
-    await auditLog(accountId, userId, 'send', messageId, { to: toAddrs, subject: msg.subject, delivery_method: 'sendgrid' }, ip);
+    await auditLog(accountId, userId, 'send', messageId, { to: toAddrs, subject: msg.subject }, ip);
     await emailLog('info', 'outbound', `Message sent: ${msg.subject}`, { messageId, to: toAddrs });
   } else {
     const errorMsg = lastError?.response?.body?.errors?.[0]?.message || lastError?.message || 'Unknown send error';
@@ -589,8 +369,7 @@ router.get('/accounts/:id/messages', async (req, res) => {
       const total = parseInt(countResult.rows[0].total, 10);
 
       const messagesResult = await query(
-        `SELECT * FROM (
-           SELECT DISTINCT ON (COALESCE(m.thread_id, m.message_id, m.id::text))
+        `SELECT DISTINCT ON (COALESCE(m.thread_id, m.message_id, m.id::text))
                 m.id, m.folder_id, m.message_id, m.thread_id,
                 m.from_address, m.from_name, m.to_addresses, m.cc_addresses,
                 m.subject, m.is_read, m.is_starred, m.is_draft, m.priority,
@@ -611,8 +390,6 @@ router.get('/accounts/:id/messages', async (req, res) => {
          WHERE ${where}
          ORDER BY COALESCE(m.thread_id, m.message_id, m.id::text),
                   COALESCE(m.received_at, m.created_at) DESC
-         ) threads
-         ORDER BY COALESCE(received_at, created_at) DESC
          LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
         [...params, limit, offset]
       );

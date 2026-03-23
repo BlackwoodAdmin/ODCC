@@ -108,6 +108,8 @@ app.use('/api/email', emailAdminLogRoutes);
 // Donation routes (origin check on public create-payment-intent; webhook excluded — has Stripe sig)
 app.use('/api/donations', requireOriginCheck, donationRoutes);
 
+// Serve public/ for AI-generated images and other static assets
+app.use(express.static(path.join(__dirname, '..', 'public')));
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 app.get('*', (req, res) => {

@@ -8,14 +8,14 @@ export default function Blog() {
 
   return (
     <div>
-      <section className="relative py-10 bg-charcoal text-white">
+      <section className="relative py-24 bg-charcoal text-white">
         <div className="container-custom text-center">
           <h1 className="text-5xl font-bold mb-4">Blog</h1>
           <p className="text-xl text-gray-300">News, devotionals, and updates from our church family</p>
         </div>
       </section>
 
-      <section className="pt-8 pb-16 bg-white">
+      <section className="section-padding bg-white">
         <div className="container-custom">
           {loading ? (
             <div className="text-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage mx-auto"></div></div>

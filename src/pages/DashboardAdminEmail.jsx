@@ -77,7 +77,6 @@ function AccountModal({ account, users, onClose, onSaved }) {
   const [form, setForm] = useState({
     address_prefix: account?.address ? account.address.replace(DOMAIN, '') : '',
     display_name: account?.display_name || '',
-    assignment_type: account?.assigned_role === 'admin' ? 'admin' : (account?.user_id ? 'user' : 'none'),
     user_id: account?.user_id || '',
     quota_mb: account?.quota_mb || 500,
     daily_send_limit: account?.daily_send_limit || 200,
@@ -89,12 +88,11 @@ function AccountModal({ account, users, onClose, onSaved }) {
     e.preventDefault();
     setSaving(true);
     try {
-      const { address_prefix, assignment_type, ...rest } = form;
+      const { address_prefix, ...rest } = form;
       const payload = {
         ...rest,
         address: address_prefix.toLowerCase().trim() + DOMAIN,
-        user_id: assignment_type === 'user' ? (form.user_id || null) : null,
-        assigned_role: assignment_type === 'admin' ? 'admin' : null,
+        user_id: form.user_id || null,
         quota_mb: parseInt(form.quota_mb) || 500,
         daily_send_limit: parseInt(form.daily_send_limit) || 200,
       };
@@ -150,22 +148,17 @@ function AccountModal({ account, users, onClose, onSaved }) {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-charcoal mb-1">Assign To</label>
-            <div className="space-y-2">
-              <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer">
-                <input type="radio" name="assignment_type" value="none" checked={form.assignment_type === 'none'} onChange={e => setForm({ ...form, assignment_type: e.target.value })} className="w-4 h-4 border-gray-300 text-sage focus:ring-sage" />
-                Unassigned
-              </label>
-              <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer">
-                <input type="radio" name="assignment_type" value="user" checked={form.assignment_type === 'user'} onChange={e => setForm({ ...form, assignment_type: e.target.value })} className="w-4 h-4 border-gray-300 text-sage focus:ring-sage" />
-                Specific User
-              </label>
-              {form.assignment_type === 'user' && (<select value={form.user_id} onChange={e => setForm({ ...form, user_id: e.target.value })} className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm ml-6"><option value="">-- Select user --</option>{users.map(u => (<option key={u.id} value={u.id}>{u.name} ({u.email})</option>))}</select>)}
-              <label className="flex items-center gap-2 text-sm text-charcoal cursor-pointer">
-                <input type="radio" name="assignment_type" value="admin" checked={form.assignment_type === 'admin'} onChange={e => setForm({ ...form, assignment_type: e.target.value })} className="w-4 h-4 border-gray-300 text-sage focus:ring-sage" />
-                All Admin Users
-              </label>
-            </div>
+            <label className="block text-sm font-medium text-charcoal mb-1">Assign to User</label>
+            <select
+              value={form.user_id}
+              onChange={e => setForm({ ...form, user_id: e.target.value })}
+              className="w-full border border-gray-200 rounded-lg px-4 py-2.5 text-sm"
+            >
+              <option value="">-- Unassigned --</option>
+              {users.map(u => (
+                <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+              ))}
+            </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

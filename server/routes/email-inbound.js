@@ -372,7 +372,6 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
             table: ['border', 'cellpadding', 'cellspacing', 'style', 'width', 'height', 'align', 'bgcolor'],
           },
           allowedSchemes: ['http', 'https', 'mailto'],
-          allowVulnerableTags: true,
         });
       }
 
@@ -563,7 +562,7 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
 // ===========================================================================
 // Auto-reply processing
 // ===========================================================================
-export async function processAutoReply(account, senderAddress, parsedMime, now) {
+async function processAutoReply(account, senderAddress, parsedMime, now) {
   try {
     // Fetch auto-reply config
     const arResult = await query(

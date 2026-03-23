@@ -15,7 +15,7 @@ export default function DashboardPosts() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ title: '', content: '', excerpt: '', status: 'published' });
+  const [form, setForm] = useState({ title: '', content: '', excerpt: '', slug: '', status: 'published' });
   const [imageFile, setImageFile] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [showAi, setShowAi] = useState(false);
@@ -50,6 +50,22 @@ export default function DashboardPosts() {
     setDirty(true);
   }, []);
 
+  const generateSlugFromTitle = (title) => {
+    return title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  };
+
+  const handleTitleChange = (e) => {
+    const newTitle = e.target.value;
+    setForm(f => ({ ...f, title: newTitle }));
+    setDirty(true);
+  };
+
+  const handleSlugChange = (e) => {
+    const newSlug = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').replace(/^-|-$/g, '');
+    setForm(f => ({ ...f, slug: newSlug }));
+    setDirty(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
@@ -57,6 +73,7 @@ export default function DashboardPosts() {
       formData.append('title', form.title);
       formData.append('content', form.content);
       formData.append('excerpt', form.excerpt);
+      formData.append('slug', form.slug);
       formData.append('status', form.status);
       if (imageFile) formData.append('image', imageFile);
 
@@ -82,14 +99,14 @@ export default function DashboardPosts() {
   };
 
   const editPost = (post) => {
-    setForm({ title: post.title, content: post.content, excerpt: post.excerpt || '', status: post.status });
+    setForm({ title: post.title, content: post.content, excerpt: post.excerpt || '', slug: post.slug || '', status: post.status });
     setEditing(post.id);
     setShowForm(true);
     setDirty(false);
   };
 
   const resetForm = () => {
-    setForm({ title: '', content: '', excerpt: '', status: 'published' });
+    setForm({ title: '', content: '', excerpt: '', slug: '', status: 'published' });
     setEditing(null);
     setShowForm(false);
     setImageFile(null);
@@ -132,7 +149,18 @@ export default function DashboardPosts() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <label className="block text-sm font-medium text-charcoal mb-2">Title *</label>
-                <input type="text" value={form.title} onChange={e => { setForm({ ...form, title: e.target.value }); setDirty(true); }} required className="w-full border border-gray-200 rounded-lg px-4 py-3" />
+                <input type="text" value={form.title} onChange={handleTitleChange} required className="w-full border border-gray-200 rounded-lg px-4 py-3" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-charcoal mb-2">URL Slug *</label>
+                <input
+                  type="text"
+                  value={form.slug}
+                  onChange={handleSlugChange}
+                  placeholder={form.title ? generateSlugFromTitle(form.title) : 'post-slug'}
+                  className="w-full border border-gray-200 rounded-lg px-4 py-3 font-mono text-sm"
+                />
+                <p className="text-xs text-gray-500 mt-1">Used in the post URL. Letters, numbers, and hyphens only.</p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-charcoal mb-2">Excerpt</label>

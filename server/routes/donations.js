@@ -591,7 +591,7 @@ router.get('/my-donations', authenticateToken, async (req, res) => {
               COALESCE(SUM(amount_cents), 0) as total_cents,
               COUNT(*) FILTER (WHERE type = 'recurring') as recurring_count
        FROM donations
-       WHERE (user_id = $1 OR donor_email = $2) AND status NOT IN ('failed', 'canceled')`,
+       WHERE (user_id = $1 OR donor_email = $2) AND status = 'completed'`,
       [req.user.id, req.user.email]
     );
 

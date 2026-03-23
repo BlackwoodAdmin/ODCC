@@ -1,2 +1,2 @@
 ## Architecture Overview
-This is a full-stack application comprising a React frontend in `src/` and an Express.js backend in `server/`. The backend exposes a RESTful API and connects to a PostgreSQL database via `server/db.js`. Major subsystems include user authentication,
+This is a fullstack application featuring a React frontend located in `src/` and a Node.js/Express backend within `server/`. The frontend is responsible for user interface and interaction, consuming data from the backend's RESTful API. The backend manages a PostgreSQL

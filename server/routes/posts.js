@@ -67,9 +67,9 @@ router.get('/:slug', async (req, res) => {
 
 router.post('/', authenticateToken, requireRole('admin','contributor'), upload.single('image'), async (req, res) => {
   try {
-    const { title, content, excerpt, status = 'draft' } = req.body;
+    const { title, content, excerpt, status = 'draft', slug: customSlug } = req.body;
     const cleanContent = sanitizeHtml(content, SANITIZE_OPTIONS);
-    const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const slug = customSlug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
     const image = req.file ? `/uploads/${req.file.filename}` : null;
     const now = Date.now();
     const publishedAt = status === 'published' ? now : null;
@@ -102,12 +102,26 @@ router.put('/:id', authenticateToken, requireRole('admin','contributor'), upload
     const post = await query('SELECT * FROM posts WHERE id=$1', [req.params.id]);
     if (!post.rows.length) return res.status(404).json({ error: 'Post not found' });
     if (req.user.role !== 'admin' && post.rows[0].author_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
-    const { title, content, excerpt, status } = req.body;
+    const { title, content, excerpt, status, slug: customSlug } = req.body;
     const cleanContent = content ? sanitizeHtml(content, SANITIZE_OPTIONS) : post.rows[0].content;
-    const slug = title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : post.rows[0].slug;
+    let slug = customSlug || (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : post.rows[0].slug);
     const image = req.file ? `/uploads/${req.file.filename}` : post.rows[0].featured_image;
     const now = Date.now();
     const publishedAt = status === 'published' && !post.rows[0].published_at ? now : post.rows[0].published_at;
+    
+    // Only check for slug collisions if slug is being changed
+    if (slug !== post.rows[0].slug) {
+      const existing = await query('SELECT id, slug FROM posts WHERE slug LIKE $1 AND id != $2', [slug + '%', req.params.id]);
+      if (existing.rows.length) {
+        const taken = new Set(existing.rows.map(r => r.slug));
+        if (taken.has(slug)) {
+          let suffix = 2;
+          while (taken.has(`${slug}-${suffix}`)) suffix++;
+          slug = `${slug}-${suffix}`;
+        }
+      }
+    }
+    
     const result = await query(
       'UPDATE posts SET title=$1,slug=$2,content=$3,excerpt=$4,featured_image=$5,status=$6,published_at=$7,updated_at=$8 WHERE id=$9 RETURNING *',
       [title || post.rows[0].title, slug, cleanContent, excerpt || post.rows[0].excerpt, image, status || post.rows[0].status, publishedAt, now, req.params.id]

@@ -38,15 +38,15 @@ export default function BlogPost() {
 
   return (
     <div>
-      <section className="relative py-10 bg-charcoal text-white">
-        <div className="container-custom text-center max-w-6xl">
+      <section className="relative py-24 bg-charcoal text-white">
+        <div className="container-custom text-center max-w-3xl">
           <p className="text-sage text-sm font-medium mb-4">{formatDate(post.created_at)} · By {post.author_name}</p>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">{post.title}</h1>
         </div>
       </section>
 
-      <section className="pt-6 pb-16 bg-white">
-        <div className="container-custom max-w-6xl">
+      <section className="section-padding bg-white">
+        <div className="container-custom max-w-3xl">
           {post.featured_image && (
             <img src={post.featured_image} alt={post.title} className="w-full rounded-xl mb-8 shadow-md" />
           )}
@@ -80,11 +80,7 @@ export default function BlogPost() {
               {comments.map(c => (
                 <div key={c.id} className="bg-cream rounded-xl p-6">
                   <div className="flex items-center gap-3 mb-3">
-                    {c.profile_image ? (
-                      <img src={c.profile_image} alt={c.author_name} className="w-10 h-10 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-10 h-10 bg-sage text-white rounded-full flex items-center justify-center font-bold">{c.author_name?.[0]?.toUpperCase()}</div>
-                    )}
+                    <div className="w-10 h-10 bg-sage text-white rounded-full flex items-center justify-center font-bold">{c.author_name?.[0]?.toUpperCase()}</div>
                     <div>
                       <p className="font-semibold text-charcoal">{c.author_name}</p>
                       <p className="text-xs text-gray-400">{formatDateTime(c.created_at)}</p>
