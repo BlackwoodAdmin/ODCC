@@ -38,12 +38,10 @@ export default function DashboardPosts() {
   const [aiAvailable, setAiAvailable] = useState(false);
   const editorRef = useRef(null);
 
-  // Check AI availability
   useEffect(() => {
     api.get('/ai/status').then(data => setAiAvailable(data.available)).catch(() => {});
   }, []);
 
-  // Unsaved changes warning
   useEffect(() => {
     if (!dirty) return;
     const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
@@ -252,7 +250,7 @@ export default function DashboardPosts() {
                     <td className="px-6 py-4 hidden md:table-cell">
                       <span className={`text-xs px-2 py-1 rounded-full font-medium ${post.status === 'published' ? 'bg-green-50 text-green-600' : 'bg-gray-100 text-gray-500'}`}>{post.status}</span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 hidden md:table-cell">{formatDate(post.created_at)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500 hidden md:table-cell">{formatDate(post.published_at || post.created_at)}</td>
                     <td className="px-6 py-4 text-right">
                       <button onClick={() => editPost(post)} className="text-sage hover:underline text-sm mr-3">Edit</button>
                       <button onClick={() => deletePost(post.id)} className="text-red-500 hover:underline text-sm">Delete</button>
