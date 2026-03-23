@@ -5,7 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { initializeDatabase } from './db.js';
+import { initializeDatabase, query } from './db.js';
 import authRoutes from './routes/auth.js';
 import postRoutes from './routes/posts.js';
 import eventRoutes from './routes/events.js';
@@ -112,9 +112,83 @@ app.use('/api/donations', requireOriginCheck, donationRoutes);
 app.use(express.static(path.join(__dirname, '..', 'public')));
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
+
+// Blog post route with OGP meta tags
+app.get('/blog/:slug', async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const result = await query(
+      'SELECT title, excerpt, featured_image FROM posts WHERE slug = $1 AND status = $2',
+      [slug, 'published']
+    );
+
+    if (result.rows.length === 0) {
+      // Post not found, serve regular SPA
+      return res.sendFile(path.join(distPath, 'index.html'));
+    }
+
+    const post = result.rows[0];
+    const siteUrl = 'https://opendoorchristian.church';
+    const postUrl = `${siteUrl}/blog/${slug}`;
+    const ogImage = post.featured_image || `${siteUrl}/og-default.png`;
+    const ogTitle = escapeHtml(post.title || 'Blog Post');
+    const ogDescription = escapeHtml(post.excerpt || 'Read this post');
+
+    const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${ogTitle} - Open Door Christian Church</title>
+  <meta name="description" content="${ogDescription}" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  
+  <!-- Open Graph Protocol -->
+  <meta property="og:title" content="${ogTitle}" />
+  <meta property="og:description" content="${ogDescription}" />
+  <meta property="og:image" content="${ogImage}" />
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${postUrl}" />
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${ogTitle}" />
+  <meta name="twitter:description" content="${ogDescription}" />
+  <meta name="twitter:image" content="${ogImage}" />
+  
+  <script type="module" crossorigin src="/assets/index-DMftvkdP.js"><\/script>
+  <link rel="stylesheet" crossorigin href="/assets/index-DgqNJR3Y.css">
+</head>
+<body>
+  <div id="root"></div>
+</body>
+</html>`;
+
+    res.type('html').send(html);
+  } catch (error) {
+    console.error('Blog post SSR error:', error);
+    res.sendFile(path.join(distPath, 'index.html'));
+  }
+});
+
+// Catch-all route for SPA
 app.get('*', (req, res) => {
   res.sendFile(path.join(distPath, 'index.html'));
 });
+
+// Helper function to escape HTML special characters
+function escapeHtml(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
 
 async function start() {
   await initializeDatabase();
