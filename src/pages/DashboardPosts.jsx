@@ -91,7 +91,7 @@ export default function DashboardPosts() {
       formData.append('excerpt', form.excerpt);
       formData.append('slug', form.slug);
       formData.append('status', form.status);
-      if (form.published_at) formData.append('published_at', form.published_at);
+      formData.append('published_at', form.published_at || '');
       if (imageFile) formData.append('image', imageFile);
 
       if (editing) {
