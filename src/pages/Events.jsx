@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Helmet } from 'react-helmet-async';
 import api from '../services/api';
 import { formatTime, todayET, nowET } from '../utils/formatters';
 
@@ -100,20 +99,6 @@ export default function Events() {
 
   return (
     <div>
-      <Helmet>
-        <title>Events - Open Door Christian Church</title>
-        <meta name="description" content="View upcoming events and activities at Open Door Christian Church in DeLand, Florida." />
-        <meta property="og:title" content="Events - Open Door Christian Church" />
-        <meta property="og:description" content="View upcoming events and activities at Open Door Christian Church in DeLand, Florida." />
-        <meta property="og:image" content="https://church.cloud.webstack.ceo/uploads/church-header.jpg" />
-        <meta property="og:url" content="https://opendoorchristian.church/events" />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:title" content="Events - Open Door Christian Church" />
-        <meta name="twitter:description" content="View upcoming events and activities at Open Door Christian Church in DeLand, Florida." />
-        <meta name="twitter:image" content="https://church.cloud.webstack.ceo/uploads/church-header.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-      </Helmet>
-
       <section className="relative py-16 bg-charcoal text-white">
         <div className="container-custom text-center">
           <h1 className="text-5xl font-bold mb-4">Events</h1>

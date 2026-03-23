@@ -1,6 +1,5 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
 import useFetch from '../hooks/useFetch';
 import { formatDate } from '../utils/formatters';
 
@@ -9,20 +8,6 @@ export default function Blog() {
 
   return (
     <div>
-      <Helmet>
-        <title>Blog - Open Door Christian Church</title>
-        <meta name="description" content="Read blog posts, devotionals, and updates from Open Door Christian Church in DeLand, Florida." />
-        <meta property="og:title" content="Blog - Open Door Christian Church" />
-        <meta property="og:description" content="Read blog posts, devotionals, and updates from Open Door Christian Church in DeLand, Florida." />
-        <meta property="og:image" content="https://church.cloud.webstack.ceo/uploads/church-header.jpg" />
-        <meta property="og:url" content="https://opendoorchristian.church/blog" />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:title" content="Blog - Open Door Christian Church" />
-        <meta name="twitter:description" content="Read blog posts, devotionals, and updates from Open Door Christian Church in DeLand, Florida." />
-        <meta name="twitter:image" content="https://church.cloud.webstack.ceo/uploads/church-header.jpg" />
-        <meta name="twitter:card" content="summary_large_image" />
-      </Helmet>
-
       <section className="relative py-24 bg-charcoal text-white">
         <div className="container-custom text-center">
           <h1 className="text-5xl font-bold mb-4">Blog</h1>
