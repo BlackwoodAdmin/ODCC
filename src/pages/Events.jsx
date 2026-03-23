@@ -150,7 +150,7 @@ export default function Events() {
                         {cell.day}
                       </div>
                       <div className="space-y-0.5">
-                        {dayEvents.slice(0, 3).map((ev, i) => (
+                        {dayEvents.map((ev, i) => (
                           <div
                             key={i}
                             className="text-xs px-1.5 py-0.5 rounded bg-sage/15 text-sage font-medium truncate"
@@ -159,9 +159,6 @@ export default function Events() {
                             {ev.event_time ? formatTime(ev.event_time).replace(':00 ', ' ') : ''} {ev.title}
                           </div>
                         ))}
-                        {dayEvents.length > 3 && (
-                          <div className="text-xs text-gray-400 px-1.5">+{dayEvents.length - 3} more</div>
-                        )}
                       </div>
                     </div>
                   );
