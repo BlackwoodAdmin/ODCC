@@ -2,7 +2,7 @@ import sgMail from '@sendgrid/mail';
 import crypto from 'crypto';
 import { wrapEmailHtml, wrapEmailText } from './data/email-template-wrapper.js';
 
-const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'noreply@opendoorchristian.church';
+const FROM_EMAIL = process.env.SENDGRID_FROM_EMAIL || 'hello@opendoorchristian.church';
 const FROM_NAME = 'Open Door Christian Church';
 const SITE_URL = process.env.SITE_URL || 'https://opendoorchristian.church';
 const UNSUBSCRIBE_SECRET = process.env.NEWSLETTER_UNSUBSCRIBE_SECRET || process.env.JWT_SECRET;
