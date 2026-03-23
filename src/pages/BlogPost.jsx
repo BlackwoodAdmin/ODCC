@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import useFetch from '../hooks/useFetch';
 import useAuth from '../hooks/useAuth';
 import useNotification from '../hooks/useNotification';
@@ -36,8 +37,29 @@ export default function BlogPost() {
   if (loading) return <div className="flex justify-center items-center min-h-screen"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage"></div></div>;
   if (!post) return <div className="text-center py-24"><h2 className="text-2xl font-bold">Post not found</h2><Link to="/blog" className="text-sage mt-4 inline-block">Back to Blog</Link></div>;
 
+  const plainText = post.content?.replace(/<[^>]*>/g, '') || '';
+  const excerpt = (post.excerpt || plainText).substring(0, 160);
+  const imageUrl = post.featured_image || 'https://church.cloud.webstack.ceo/uploads/church-header.jpg';
+  const postUrl = `https://opendoorchristian.church/blog/${slug}`;
+
   return (
     <div>
+      <Helmet>
+        <title>{post.title} - Open Door Christian Church Blog</title>
+        <meta name="description" content={excerpt} />
+        <meta property="og:title" content={post.title} />
+        <meta property="og:description" content={excerpt} />
+        <meta property="og:image" content={imageUrl} />
+        <meta property="og:url" content={postUrl} />
+        <meta property="og:type" content="article" />
+        <meta name="twitter:title" content={post.title} />
+        <meta name="twitter:description" content={excerpt} />
+        <meta name="twitter:image" content={imageUrl} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta property="article:author" content={post.author_name} />
+        <meta property="article:published_time" content={new Date(post.published_at || post.created_at).toISOString()} />
+      </Helmet>
+
       <section className="relative py-24 bg-charcoal text-white">
         <div className="container-custom text-center max-w-3xl">
           <p className="text-sage text-sm font-medium mb-4">{formatDate(post.published_at || post.created_at)} · By {post.author_name}</p>

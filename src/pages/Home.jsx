@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import useFetch from '../hooks/useFetch';
 import useAuth from '../hooks/useAuth';
 import { formatDate } from '../utils/formatters';
@@ -13,6 +14,20 @@ export default function Home() {
 
   return (
     <div>
+      <Helmet>
+        <title>Open Door Christian Church - DeLand, FL</title>
+        <meta name="description" content="Welcome to Open Door Christian Church in DeLand, Florida. Join us for worship services, community events, and fellowship." />
+        <meta property="og:title" content="Open Door Christian Church - DeLand, FL" />
+        <meta property="og:description" content="Welcome to Open Door Christian Church in DeLand, Florida. Join us for worship services, community events, and fellowship." />
+        <meta property="og:image" content="https://church.cloud.webstack.ceo/uploads/church-header.jpg" />
+        <meta property="og:url" content="https://opendoorchristian.church" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:title" content="Open Door Christian Church - DeLand, FL" />
+        <meta name="twitter:description" content="Welcome to Open Door Christian Church in DeLand, Florida. Join us for worship services, community events, and fellowship." />
+        <meta name="twitter:image" content="https://church.cloud.webstack.ceo/uploads/church-header.jpg" />
+        <meta name="twitter:card" content="summary_large_image" />
+      </Helmet>
+
       {/* Hero */}
       <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center">
         <div className="absolute inset-0">
