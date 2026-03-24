@@ -8,7 +8,7 @@ import fs from 'fs/promises';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, '...', '..', 'public', 'uploads');
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'public', 'uploads');
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -50,6 +50,9 @@ router.post('/image', authenticateToken, requireRole('admin', 'contributor'), up
     if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) {
       return res.status(500).json({ error: 'Invalid output path' });
     }
+
+    // Ensure uploads directory exists
+    await fs.mkdir(UPLOADS_DIR, { recursive: true });
 
     await fs.writeFile(outputPath, processed);
 
