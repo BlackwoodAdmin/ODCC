@@ -8,11 +8,11 @@ import fs from 'fs/promises';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'public', 'uploads');
+const UPLOADS_DIR = path.join(__dirname, '...', '..', 'public', 'uploads');
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 25 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, ['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)),
 });
 
