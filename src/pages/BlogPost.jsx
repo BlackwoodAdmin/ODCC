@@ -53,14 +53,14 @@ export default function BlogPost() {
         <meta name="twitter:image" content={post.featured_image || 'https://church.cloud.webstack.ceo/uploads/church-header.jpg'} />
       </Helmet>
       <section className="relative py-24 bg-charcoal text-white">
-        <div className="container-custom text-center max-w-3xl">
+        <div className="container-custom text-center max-w-5xl">
           <p className="text-sage text-sm font-medium mb-4">{formatDate(post.published_at || post.created_at)} · By {post.author_name}</p>
           <h1 className="text-4xl md:text-5xl font-bold mb-4">{post.title}</h1>
         </div>
       </section>
 
       <section className="section-padding bg-white">
-        <div className="container-custom max-w-3xl">
+        <div className="container-custom max-w-5xl">
           {post.featured_image && (
             <img src={post.featured_image} alt={post.title} className="w-full rounded-xl mb-8 shadow-md" />
           )}
