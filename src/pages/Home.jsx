@@ -187,7 +187,8 @@ export default function Home() {
         <div className="container-custom text-center">
           <h2 className="text-4xl md:text-5xl font-bold mb-6">Come Worship With Us</h2>
           <p className="text-xl text-gray-300 mb-4 max-w-2xl mx-auto">1700 S Clara Ave, DeLand, FL 32720</p>
-          <p className="text-gray-400 mb-8">Phone: (386) 734-8200</p>
+          <p className="text-gray-400">Phone: (386) 734-8200</p>
+          <p className="text-gray-400 mb-8">Office Hours: Tues – Fri, 9:00 AM – 1:00 PM</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/contact" className="btn-primary">Get Directions</Link>
             <Link to="/services" className="btn-secondary">Service Times</Link>

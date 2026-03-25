@@ -62,6 +62,8 @@ export default function Footer() {
               <p>10:30 AM · Chapel</p>
               <p className="mt-2 font-medium text-cream">Wednesday</p>
               <p>6:00 PM · Bible Study</p>
+              <p className="mt-3 font-medium text-cream">Office Hours</p>
+              <p>Tues – Fri · 9:00 AM – 1:00 PM</p>
             </div>
           </div>
 

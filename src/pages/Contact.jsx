@@ -82,6 +82,10 @@ export default function Contact() {
                   </div>
                 </div>
                 <div className="bg-cream rounded-xl p-6">
+                  <h3 className="font-bold text-charcoal mb-2">🏢 Office Hours</h3>
+                  <p className="text-gray-600 text-sm">Tuesday – Friday · 9:00 AM – 1:00 PM</p>
+                </div>
+                <div className="bg-cream rounded-xl p-6">
                   <h3 className="font-bold text-charcoal mb-2">🌐 Social Media</h3>
                   <a href="http://www.facebook.com/OpenDoorChurchDeland/" target="_blank" rel="noopener noreferrer" className="text-sage hover:underline">Follow us on Facebook</a>
                 </div>
