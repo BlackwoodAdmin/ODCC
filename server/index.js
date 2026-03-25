@@ -113,7 +113,10 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 const distPath = path.join(__dirname, '..', 'dist');
 app.use(express.static(distPath));
 
-// Blog post route with OGP meta tags
+// Read index.html template once at startup for blog OGP injection
+const indexHtml = fs.readFileSync(path.join(distPath, 'index.html'), 'utf-8');
+
+// Blog post route with OGP meta tags — injects OG tags into the real index.html
 app.get('/blog/:slug', async (req, res) => {
   try {
     const { slug } = req.params;
@@ -123,76 +126,50 @@ app.get('/blog/:slug', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      // Post not found, serve regular SPA
-      return res.sendFile(path.join(distPath, 'index.html'));
+      return res.type('html').send(indexHtml);
     }
 
     const post = result.rows[0];
-    const siteUrl = 'https://church.cloud.webstack.ceo';
+    const siteUrl = 'https://opendoorchristian.church';
     const postUrl = `${siteUrl}/blog/${slug}`;
-    
-    // Ensure og:image is always an absolute URL
+
     let ogImage = `${siteUrl}/uploads/church-header.webp`;
     let ogImageType = 'image/webp';
     if (post.featured_image) {
-      if (post.featured_image.startsWith('http')) {
-        ogImage = post.featured_image;
-      } else {
-        ogImage = `${siteUrl}${post.featured_image}`;
-      }
-      // Detect image type from featured_image extension
-      if (post.featured_image.endsWith('.jpg') || post.featured_image.endsWith('.jpeg')) {
-        ogImageType = 'image/jpeg';
-      } else if (post.featured_image.endsWith('.png')) {
-        ogImageType = 'image/png';
-      } else if (post.featured_image.endsWith('.gif')) {
-        ogImageType = 'image/gif';
-      } else {
-        ogImageType = 'image/webp';
-      }
+      ogImage = post.featured_image.startsWith('http')
+        ? post.featured_image
+        : `${siteUrl}${post.featured_image}`;
+      const ext = post.featured_image.split('.').pop()?.toLowerCase();
+      if (ext === 'jpg' || ext === 'jpeg') ogImageType = 'image/jpeg';
+      else if (ext === 'png') ogImageType = 'image/png';
+      else if (ext === 'gif') ogImageType = 'image/gif';
     }
-    
+
     const ogTitle = escapeHtml(post.title || 'Blog Post');
     const ogDescription = escapeHtml(post.excerpt || 'Read this post');
 
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    const ogTags = `
   <title>${ogTitle} - Open Door Christian Church</title>
   <meta name="description" content="${ogDescription}" />
-  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  
-  <!-- Open Graph Protocol -->
   <meta property="og:title" content="${ogTitle}" />
   <meta property="og:description" content="${ogDescription}" />
   <meta property="og:image" content="${ogImage}" />
   <meta property="og:image:type" content="${ogImageType}" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${postUrl}" />
-  
-  <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
-  <meta name="twitter:image" content="${ogImage}" />
-  
-  <script type="module" crossorigin src="/assets/index-DMftvkdP.js"><\/script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DgqNJR3Y.css">
-</head>
-<body>
-  <div id="root"></div>
-</body>
-</html>`;
+  <meta name="twitter:image" content="${ogImage}" />`;
+
+    // Inject OG tags before </head>, replace <title> if present
+    let html = indexHtml.replace(/<title>[^<]*<\/title>/, '');
+    html = html.replace('</head>', ogTags + '\n</head>');
 
     res.type('html').send(html);
   } catch (error) {
     console.error('Blog post SSR error:', error);
-    res.sendFile(path.join(distPath, 'index.html'));
+    res.type('html').send(indexHtml);
   }
 });
 
