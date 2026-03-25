@@ -1,20 +1,22 @@
 import { Router } from 'express';
 import multer from 'multer';
 import path from 'path';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import sanitizeHtml from 'sanitize-html';
+import sharp from 'sharp';
+import fs from 'fs/promises';
 import { query } from '../db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { SANITIZE_OPTIONS } from '../data/sanitize-config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'public', 'uploads');
+
 const upload = multer({
-  storage: multer.diskStorage({
-    destination: path.join(__dirname, '..', '..', 'public', 'uploads'),
-    filename: (req, file, cb) => cb(null, `post_${Date.now()}${path.extname(file.originalname)}`)
-  }),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, ['image/jpeg','image/png','image/webp'].includes(file.mimetype))
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, ['image/jpeg','image/png','image/webp','image/gif'].includes(file.mimetype))
 });
 
 const router = Router();
@@ -70,10 +72,42 @@ router.post('/', authenticateToken, requireRole('admin','contributor'), upload.s
     const { title, content, excerpt, status = 'draft', slug: customSlug, published_at: customPublishedAt } = req.body;
     const cleanContent = sanitizeHtml(content, SANITIZE_OPTIONS);
     const slug = customSlug || title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-    const image = req.file ? `/uploads/${req.file.filename}` : null;
+    
+    let image = null;
+    if (req.file) {
+      try {
+        const metadata = await sharp(req.file.buffer, { limitInputPixels: 25_000_000 }).metadata();
+        if (!['jpeg', 'png', 'webp', 'gif', 'tiff'].includes(metadata.format)) {
+          return res.status(400).json({ error: 'Unsupported image format.' });
+        }
+        
+        const processed = await sharp(req.file.buffer, { limitInputPixels: 25_000_000 })
+          .resize({ width: 1200, withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+        
+        const hex = crypto.randomBytes(4).toString('hex');
+        const filename = `img_${Date.now()}_${hex}.webp`;
+        const outputPath = path.join(UPLOADS_DIR, filename);
+        const resolved = path.resolve(outputPath);
+        if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) {
+          return res.status(500).json({ error: 'Invalid output path' });
+        }
+        
+        await fs.mkdir(UPLOADS_DIR, { recursive: true });
+        await fs.writeFile(outputPath, processed);
+        image = `/uploads/${filename}`;
+      } catch (err) {
+        if (err.code === 'ENOSPC') {
+          return res.status(507).json({ error: 'Server disk is full. Contact administrator.' });
+        }
+        console.error('[Posts] Image conversion failed:', err);
+        return res.status(400).json({ error: 'Failed to process image.' });
+      }
+    }
+    
     const now = Date.now();
     const publishedAt = customPublishedAt && customPublishedAt !== '' ? parseInt(customPublishedAt) : (status === 'published' ? now : null);
-    // Handle slug collisions by appending -2, -3, etc.
     let finalSlug = slug;
     const existing = await query('SELECT slug FROM posts WHERE slug LIKE $1', [slug + '%']);
     if (existing.rows.length) {
@@ -93,6 +127,7 @@ router.post('/', authenticateToken, requireRole('admin','contributor'), upload.s
     if (err.code === '23505' && err.constraint?.includes('slug')) {
       return res.status(409).json({ error: 'A post with a similar title already exists. Please change the title.' });
     }
+    console.error('[Posts] Create failed:', err);
     res.status(500).json({ error: 'Failed to create post' });
   }
 });
@@ -105,11 +140,43 @@ router.put('/:id', authenticateToken, requireRole('admin','contributor'), upload
     const { title, content, excerpt, status, slug: customSlug, published_at: customPublishedAt } = req.body;
     const cleanContent = content ? sanitizeHtml(content, SANITIZE_OPTIONS) : post.rows[0].content;
     let slug = customSlug || (title ? title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : post.rows[0].slug);
-    const image = req.file ? `/uploads/${req.file.filename}` : post.rows[0].featured_image;
+    
+    let image = post.rows[0].featured_image;
+    if (req.file) {
+      try {
+        const metadata = await sharp(req.file.buffer, { limitInputPixels: 25_000_000 }).metadata();
+        if (!['jpeg', 'png', 'webp', 'gif', 'tiff'].includes(metadata.format)) {
+          return res.status(400).json({ error: 'Unsupported image format.' });
+        }
+        
+        const processed = await sharp(req.file.buffer, { limitInputPixels: 25_000_000 })
+          .resize({ width: 1200, withoutEnlargement: true })
+          .webp({ quality: 80 })
+          .toBuffer();
+        
+        const hex = crypto.randomBytes(4).toString('hex');
+        const filename = `img_${Date.now()}_${hex}.webp`;
+        const outputPath = path.join(UPLOADS_DIR, filename);
+        const resolved = path.resolve(outputPath);
+        if (!resolved.startsWith(path.resolve(UPLOADS_DIR))) {
+          return res.status(500).json({ error: 'Invalid output path' });
+        }
+        
+        await fs.mkdir(UPLOADS_DIR, { recursive: true });
+        await fs.writeFile(outputPath, processed);
+        image = `/uploads/${filename}`;
+      } catch (err) {
+        if (err.code === 'ENOSPC') {
+          return res.status(507).json({ error: 'Server disk is full. Contact administrator.' });
+        }
+        console.error('[Posts] Image conversion failed:', err);
+        return res.status(400).json({ error: 'Failed to process image.' });
+      }
+    }
+    
     const now = Date.now();
     const publishedAt = customPublishedAt && customPublishedAt !== '' ? parseInt(customPublishedAt) : (status === 'published' && !post.rows[0].published_at ? now : post.rows[0].published_at);
     
-    // Only check for slug collisions if slug is being changed
     if (slug !== post.rows[0].slug) {
       const existing = await query('SELECT id, slug FROM posts WHERE slug LIKE $1 AND id != $2', [slug + '%', req.params.id]);
       if (existing.rows.length) {
@@ -127,7 +194,8 @@ router.put('/:id', authenticateToken, requireRole('admin','contributor'), upload
       [title || post.rows[0].title, slug, cleanContent, excerpt || post.rows[0].excerpt, image, status || post.rows[0].status, publishedAt, now, req.params.id]
     );
     res.json({ post: result.rows[0] });
-  } catch {
+  } catch (err) {
+    console.error('[Posts] Update failed:', err);
     res.status(500).json({ error: 'Failed to update post' });
   }
 });
