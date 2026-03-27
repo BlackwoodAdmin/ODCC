@@ -58,12 +58,12 @@ export default function Footer() {
               <p className="mt-3">Phone: <a href="tel:3867348200" className="hover:text-cream">(386) 734-8200</a></p>
               <p className="mt-3 font-medium text-cream">Sunday Services</p>
               <p>8:30 AM · Drive-In (87.9 FM)</p>
-              <p>9:30 AM · Bible Study</p>
+              <p>9:45 AM · Bible Study</p>
               <p>10:30 AM · Chapel</p>
               <p className="mt-2 font-medium text-cream">Wednesday</p>
               <p>6:00 PM · Bible Study</p>
               <p className="mt-3 font-medium text-cream">Office Hours</p>
-              <p>Tues – Fri · 9:00 AM – 1:00 PM</p>
+              <p>Tues – Thurs · 9:00 AM – 1:00 PM</p>
             </div>
           </div>
 

@@ -36,7 +36,7 @@ export default function Home() {
         <div className="container-custom">
           <div className="flex flex-wrap justify-center gap-6 md:gap-12 text-center text-sm md:text-base">
             <div><span className="font-bold">Drive-In</span> <span className="opacity-80">Sun 8:30 AM · 87.9 FM</span></div>
-            <div><span className="font-bold">Bible Study</span> <span className="opacity-80">Sun 9:30 AM</span></div>
+            <div><span className="font-bold">Bible Study</span> <span className="opacity-80">Sun 9:45 AM</span></div>
             <div><span className="font-bold">Chapel</span> <span className="opacity-80">Sun 10:30 AM</span></div>
 
             <div><span className="font-bold">Wednesday</span> <span className="opacity-80">6:00 PM</span></div>
@@ -188,7 +188,7 @@ export default function Home() {
           <h2 className="text-4xl md:text-5xl font-bold mb-6">Come Worship With Us</h2>
           <p className="text-xl text-gray-300 mb-4 max-w-2xl mx-auto">1700 S Clara Ave, DeLand, FL 32720</p>
           <p className="text-gray-400">Phone: (386) 734-8200</p>
-          <p className="text-gray-400 mb-8">Office Hours: Tues – Fri, 9:00 AM – 1:00 PM</p>
+          <p className="text-gray-400 mb-8">Office Hours: Tues – Thurs, 9:00 AM – 1:00 PM</p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/contact" className="btn-primary">Get Directions</Link>
             <Link to="/services" className="btn-secondary">Service Times</Link>

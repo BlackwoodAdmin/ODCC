@@ -5,6 +5,72 @@ import { emailLog } from '../utils/email-log.js';
 
 const router = Router();
 
+// ── SendGrid Verified Sender helpers ────────────────────────────────────────
+
+async function addSendGridVerifiedSender(address, displayName) {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) return { ok: false, error: 'SENDGRID_API_KEY not configured' };
+
+  try {
+    const res = await fetch('https://api.sendgrid.com/v3/verified_senders', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nickname: displayName || address.split('@')[0],
+        from_email: address,
+        from_name: displayName || '',
+        reply_to: address,
+        reply_to_name: '',
+        address: 'Open Door Christian Church',
+        address2: '1700 S Clara Ave',
+        city: 'DeLand',
+        state: 'FL',
+        zip: '32720',
+        country: 'US',
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const msg = data?.errors?.[0]?.message || JSON.stringify(data);
+      console.error('[SendGrid] Failed to add verified sender:', msg);
+      return { ok: false, error: msg };
+    }
+    console.log(`[SendGrid] Verified sender added: ${address} (id: ${data.id})`);
+    return { ok: true, sendgridId: data.id };
+  } catch (err) {
+    console.error('[SendGrid] Error adding verified sender:', err.message);
+    return { ok: false, error: err.message };
+  }
+}
+
+async function removeSendGridVerifiedSender(address) {
+  const apiKey = process.env.SENDGRID_API_KEY;
+  if (!apiKey) return;
+
+  try {
+    // Look up the sender ID by listing all verified senders
+    const listRes = await fetch('https://api.sendgrid.com/v3/verified_senders', {
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    if (!listRes.ok) return;
+    const { results } = await listRes.json();
+    const sender = results?.find(s => s.from_email.toLowerCase() === address.toLowerCase());
+    if (!sender) return;
+
+    const delRes = await fetch(`https://api.sendgrid.com/v3/verified_senders/${sender.id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+    });
+    if (delRes.ok || delRes.status === 204) {
+      console.log(`[SendGrid] Verified sender removed: ${address} (id: ${sender.id})`);
+    } else {
+      console.error(`[SendGrid] Failed to remove verified sender ${address}: ${delRes.status}`);
+    }
+  } catch (err) {
+    console.error('[SendGrid] Error removing verified sender:', err.message);
+  }
+}
+
 const SYSTEM_FOLDERS = [
   { name: 'Inbox', type: 'inbox', sort_order: 0 },
   { name: 'Sent', type: 'sent', sort_order: 1 },
@@ -156,12 +222,21 @@ router.post('/accounts', authenticateToken, requireRole('admin'), async (req, re
       );
     }
 
+    // Register as verified sender in SendGrid (non-blocking)
+    const sgResult = await addSendGridVerifiedSender(normalizedAddress, display_name);
+    if (!sgResult.ok) {
+      await emailLog('warn', 'admin', `SendGrid verified sender registration failed for ${normalizedAddress}: ${sgResult.error}`, {
+        account_id: account.id,
+      });
+    }
+
     await emailLog('info', 'admin', `Email account created: ${normalizedAddress}`, {
       account_id: account.id,
       admin_user_id: req.user.id,
+      sendgrid_verified: sgResult.ok,
     });
 
-    res.status(201).json({ account });
+    res.status(201).json({ account, sendgrid_verified: sgResult.ok, sendgrid_error: sgResult.ok ? null : sgResult.error });
   } catch (err) {
     await emailLog('error', 'admin', 'Failed to create email account', { error: err.message });
     res.status(500).json({ error: 'Failed to create email account' });
@@ -274,6 +349,9 @@ router.delete('/accounts/:id', authenticateToken, requireRole('admin'), async (r
     }
 
     const address = existing.rows[0].address;
+
+    // Remove from SendGrid verified senders (non-blocking, best-effort)
+    await removeSendGridVerifiedSender(address);
 
     // Collect attachment storage paths before deleting (for disk cleanup)
     const attachments = await query(

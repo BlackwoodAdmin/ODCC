@@ -9,7 +9,7 @@ export default function Services() {
       icon: '🚗', highlight: true
     },
     {
-      time: '9:30 AM', name: 'Bible Study', day: 'Sunday',
+      time: '9:45 AM', name: 'Bible Study', day: 'Sunday',
       desc: 'Join us for in-depth study of God\'s Word. Classes available for all ages. Grow deeper in your understanding of Scripture with fellow believers.',
       icon: '📖'
     },
