@@ -267,6 +267,7 @@ export async function initializeDatabase() {
       currency VARCHAR(3) NOT NULL DEFAULT 'usd',
       status VARCHAR(20) NOT NULL DEFAULT 'incomplete'
         CHECK (status IN ('incomplete', 'incomplete_expired', 'active', 'canceled', 'past_due', 'unpaid', 'paused')),
+      "interval" VARCHAR(10) NOT NULL DEFAULT 'month',
       current_period_end BIGINT,
       canceled_at BIGINT,
       created_at BIGINT NOT NULL,
@@ -349,6 +350,9 @@ export async function initializeDatabase() {
     if (!e.message.includes('already exists')) throw e;
   }
   try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_image VARCHAR(500)'); } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+  }
+  try { await pool.query('ALTER TABLE donation_subscriptions ADD COLUMN IF NOT EXISTS "interval" VARCHAR(10) NOT NULL DEFAULT \'month\''); } catch (e) {
     if (!e.message.includes('already exists')) throw e;
   }
   // Allow NULL password_hash for newsletter-only subscribers

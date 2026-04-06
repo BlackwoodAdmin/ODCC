@@ -6,7 +6,7 @@ import Turnstile from './common/Turnstile';
 import useAuth from '../hooks/useAuth';
 import api from '../services/api';
 
-function PaymentStep({ amount, isRecurring, onSuccess, onBack }) {
+function PaymentStep({ amount, frequencyLabel, onSuccess, onBack }) {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -49,7 +49,7 @@ function PaymentStep({ amount, isRecurring, onSuccess, onBack }) {
           <span className="text-gray-600">Donation Amount</span>
           <span className="text-2xl font-bold text-charcoal">${amount}</span>
         </div>
-        <p className="text-sm text-gray-500 mt-1">{isRecurring ? 'Monthly recurring gift' : 'One-time gift'}</p>
+        <p className="text-sm text-gray-500 mt-1">{frequencyLabel}</p>
       </div>
 
       <div className="mb-6">
@@ -101,7 +101,8 @@ export default function DonationForm() {
 
   const handleTurnstileToken = useCallback((token) => setTurnstileToken(token), []);
 
-  const needsAuth = type === 'recurring' && !user;
+  const isRecurring = type !== 'one_time';
+  const needsAuth = isRecurring && !user;
 
   const handleContinue = async (e) => {
     e.preventDefault();
@@ -116,9 +117,12 @@ export default function DonationForm() {
 
     setLoading(true);
     try {
+      const apiType = isRecurring ? 'recurring' : 'one_time';
+      const frequency = type === 'recurring_weekly' ? 'week' : type === 'recurring_monthly' ? 'month' : undefined;
       const res = await api.post('/donations/create-payment-intent', {
         amount: Number(amount).toFixed(2),
-        type,
+        type: apiType,
+        frequency,
         name: name.trim(),
         email: email.trim(),
         note: note.trim() || undefined,
@@ -160,7 +164,7 @@ export default function DonationForm() {
       <StripeProvider clientSecret={clientSecret}>
         <PaymentStep
           amount={Number(amount).toFixed(2)}
-          isRecurring={type === 'recurring'}
+          frequencyLabel={type === 'one_time' ? 'One-time gift' : type === 'recurring_weekly' ? 'Weekly recurring gift' : 'Monthly recurring gift'}
           onSuccess={() => setStep('success')}
           onBack={() => { setStep('details'); setClientSecret(null); }}
         />
@@ -190,33 +194,29 @@ export default function DonationForm() {
       {/* Frequency toggle */}
       <div className="mb-6">
         <label className="block text-sm font-semibold text-charcoal mb-2">Frequency</label>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => setType('one_time')}
-            className={`py-3 rounded-lg font-semibold border-2 transition-colors ${
-              type === 'one_time'
-                ? 'border-sage bg-sage/10 text-sage'
-                : 'border-gray-200 text-gray-500 hover:border-gray-300'
-            }`}
-          >
-            One-Time Gift
-          </button>
-          <button
-            type="button"
-            onClick={() => setType('recurring')}
-            className={`py-3 rounded-lg font-semibold border-2 transition-colors ${
-              type === 'recurring'
-                ? 'border-sage bg-sage/10 text-sage'
-                : 'border-gray-200 text-gray-500 hover:border-gray-300'
-            }`}
-          >
-            Monthly Gift
-          </button>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { value: 'one_time', label: 'One-Time' },
+            { value: 'recurring_weekly', label: 'Weekly' },
+            { value: 'recurring_monthly', label: 'Monthly' },
+          ].map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setType(opt.value)}
+              className={`py-3 rounded-lg font-semibold border-2 transition-colors ${
+                type === opt.value
+                  ? 'border-sage bg-sage/10 text-sage'
+                  : 'border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
         </div>
         {needsAuth && (
           <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-            To set up monthly giving, please{' '}
+            To set up recurring giving, please{' '}
             <Link to="/register" className="font-semibold underline">create an account</Link> or{' '}
             <Link to="/login" className="font-semibold underline">log in</Link>{' '}
             so you can manage your subscription later.

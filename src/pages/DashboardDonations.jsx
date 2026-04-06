@@ -74,7 +74,7 @@ export default function DashboardDonations() {
             {activeSubscriptions.map(sub => (
               <div key={sub.id} className="flex items-center justify-between py-3 border-b last:border-0">
                 <div>
-                  <p className="font-semibold text-charcoal">{formatCents(sub.amount_cents)}/month</p>
+                  <p className="font-semibold text-charcoal">{formatCents(sub.amount_cents)}/{sub.interval === 'week' ? 'week' : 'month'}</p>
                   <p className="text-sm text-gray-500">Since {formatDate(sub.created_at)}</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -121,7 +121,7 @@ export default function DashboardDonations() {
                     <tr key={d.id} className="border-t hover:bg-gray-50">
                       <td className="px-6 py-3 text-charcoal">{formatDate(d.created_at)}</td>
                       <td className="px-6 py-3 font-semibold text-charcoal">{formatCents(d.amount_cents)}</td>
-                      <td className="px-6 py-3 text-gray-600">{d.type === 'recurring' ? 'Monthly' : 'One-time'}</td>
+                      <td className="px-6 py-3 text-gray-600">{d.type === 'recurring' ? 'Recurring' : 'One-time'}</td>
                       <td className="px-6 py-3">
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${statusColors[d.status] || 'bg-gray-100'}`}>
                           {d.status}

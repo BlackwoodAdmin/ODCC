@@ -44,13 +44,13 @@ export default function BlogPost() {
         <meta name="description" content={post.excerpt || post.title} />
         <meta property="og:title" content={post.title} />
         <meta property="og:description" content={post.excerpt || post.title} />
-        <meta property="og:image" content={post.featured_image || 'https://church.cloud.webstack.ceo/uploads/church-header.jpg'} />
+        <meta property="og:image" content={post.featured_image || 'https://opendoorchristian.church/uploads/church-header.jpg'} />
         <meta property="og:type" content="article" />
         <meta property="og:url" content={`https://opendoorchristian.church/blog/${slug}`} />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={post.title} />
         <meta name="twitter:description" content={post.excerpt || post.title} />
-        <meta name="twitter:image" content={post.featured_image || 'https://church.cloud.webstack.ceo/uploads/church-header.jpg'} />
+        <meta name="twitter:image" content={post.featured_image || 'https://opendoorchristian.church/uploads/church-header.jpg'} />
       </Helmet>
       <section className="relative py-24 bg-charcoal text-white">
         <div className="container-custom text-center max-w-7xl">

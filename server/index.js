@@ -133,8 +133,8 @@ app.get('/blog/:slug', async (req, res) => {
     const siteUrl = 'https://opendoorchristian.church';
     const postUrl = `${siteUrl}/blog/${slug}`;
 
-    let ogImage = `${siteUrl}/uploads/church-header.webp`;
-    let ogImageType = 'image/webp';
+    let ogImage = `${siteUrl}/uploads/church-header.jpg`;
+    let ogImageType = 'image/jpeg';
     if (post.featured_image) {
       ogImage = post.featured_image.startsWith('http')
         ? post.featured_image
@@ -162,8 +162,9 @@ app.get('/blog/:slug', async (req, res) => {
   <meta name="twitter:description" content="${ogDescription}" />
   <meta name="twitter:image" content="${ogImage}" />`;
 
-    // Inject OG tags before </head>, replace <title> if present
+    // Strip existing title, OG, and Twitter meta tags, then inject post-specific ones
     let html = indexHtml.replace(/<title>[^<]*<\/title>/, '');
+    html = html.replace(/<meta\s+(?:property="og:[^"]*"|name="twitter:[^"]*"|name="description")[^>]*\/?\s*>\s*/g, '');
     html = html.replace('</head>', ogTags + '\n</head>');
 
     res.type('html').send(html);

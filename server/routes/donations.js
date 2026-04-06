@@ -27,7 +27,7 @@ async function getDonationProductId() {
 
   // Create one
   const product = await stripe.products.create({
-    name: 'Monthly Donation to ODCC',
+    name: 'Recurring Donation to ODCC',
     metadata: { odcc_type: 'donation' },
   });
   donationProductId = product.id;
@@ -62,7 +62,9 @@ setInterval(() => {
 // --- Validation helpers ---
 const AMOUNT_REGEX = /^\d+(\.\d{1,2})?$/;
 
-function validateDonationInput({ amount, type, name, email, note }) {
+const VALID_INTERVALS = ['week', 'month'];
+
+function validateDonationInput({ amount, type, name, email, note, frequency }) {
   const errors = [];
   if (!amount || !AMOUNT_REGEX.test(String(amount))) {
     errors.push('Amount must be a valid dollar amount (e.g. 50 or 50.00)');
@@ -74,6 +76,9 @@ function validateDonationInput({ amount, type, name, email, note }) {
   }
   if (!type || !['one_time', 'recurring'].includes(type)) {
     errors.push('Type must be one_time or recurring');
+  }
+  if (type === 'recurring' && frequency && !VALID_INTERVALS.includes(frequency)) {
+    errors.push('Frequency must be week or month');
   }
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     errors.push('Name is required');
@@ -113,8 +118,9 @@ router.post('/create-payment-intent', requireTurnstile, optionalAuth, async (req
     return res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 
-  const { amount, type, name, email, note } = req.body;
-  const errors = validateDonationInput({ amount, type, name, email, note });
+  const { amount, type, name, email, note, frequency } = req.body;
+  const interval = type === 'recurring' ? (frequency || 'month') : null;
+  const errors = validateDonationInput({ amount, type, name, email, note, frequency });
   if (errors.length) return res.status(400).json({ error: errors[0] });
 
   const trimmedName = name.trim();
@@ -125,7 +131,7 @@ router.post('/create-payment-intent', requireTurnstile, optionalAuth, async (req
   // Recurring requires auth
   if (type === 'recurring' && !req.user) {
     return res.status(401).json({
-      error: 'To set up monthly giving, please create an account or log in so you can manage your subscription later.',
+      error: 'To set up recurring giving, please create an account or log in so you can manage your subscription later.',
     });
   }
 
@@ -185,7 +191,7 @@ router.post('/create-payment-intent', requireTurnstile, optionalAuth, async (req
         price_data: {
           unit_amount: amountCents,
           currency: 'usd',
-          recurring: { interval: 'month' },
+          recurring: { interval },
           product: productId,
         },
       }],
@@ -210,9 +216,9 @@ router.post('/create-payment-intent', requireTurnstile, optionalAuth, async (req
     }
 
     await query(
-      `INSERT INTO donation_subscriptions (stripe_subscription_id, stripe_customer_id, user_id, donor_name, donor_email, amount_cents, currency, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, 'usd', 'incomplete', $7, $7)`,
-      [subscription.id, customer.id, userId, donorName, donorEmail, amountCents, now]
+      `INSERT INTO donation_subscriptions (stripe_subscription_id, stripe_customer_id, user_id, donor_name, donor_email, amount_cents, currency, status, "interval", created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, 'usd', 'incomplete', $7, $8, $8)`,
+      [subscription.id, customer.id, userId, donorName, donorEmail, amountCents, interval, now]
     );
 
     await query(
@@ -578,7 +584,7 @@ router.get('/my-donations', authenticateToken, async (req, res) => {
 
     // Active subscriptions
     const subscriptions = await query(
-      `SELECT id, stripe_subscription_id, amount_cents, currency, status, current_period_end, created_at
+      `SELECT id, stripe_subscription_id, amount_cents, currency, status, "interval", current_period_end, created_at
        FROM donation_subscriptions
        WHERE user_id = $1 OR donor_email = $2
        ORDER BY created_at DESC`,
@@ -651,7 +657,7 @@ router.get('/admin/summary', authenticateToken, requireRole('admin'), async (req
       query(`SELECT COUNT(*) as count, COALESCE(SUM(amount_cents), 0) as total_cents FROM donations WHERE status = 'completed'`),
       query(`SELECT COUNT(*) as count, COALESCE(SUM(amount_cents), 0) as total_cents FROM donations WHERE status = 'completed' AND created_at >= $1`, [thisMonthStart.getTime()]),
       query(`SELECT COUNT(*) as count, COALESCE(SUM(amount_cents), 0) as total_cents FROM donations WHERE status = 'completed' AND created_at >= $1 AND created_at < $2`, [lastMonthStart.getTime(), thisMonthStart.getTime()]),
-      query(`SELECT COUNT(*) as active_count, COALESCE(SUM(amount_cents), 0) as mrr_cents FROM donation_subscriptions WHERE status = 'active'`),
+      query(`SELECT COUNT(*) as active_count, COALESCE(SUM(CASE WHEN "interval" = 'week' THEN amount_cents * 4 ELSE amount_cents END), 0) as mrr_cents FROM donation_subscriptions WHERE status = 'active'`),
       query(`SELECT d.id, d.donor_name, d.donor_email, d.amount_cents, d.type, d.status, d.created_at FROM donations d ORDER BY d.created_at DESC LIMIT 20`),
     ]);
 

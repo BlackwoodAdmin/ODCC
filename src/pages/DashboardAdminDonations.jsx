@@ -89,8 +89,8 @@ export default function DashboardAdminDonations() {
               <p className="text-xs text-gray-400">{summary.allTime?.count || 0} donations</p>
             </div>
             <div className="bg-white rounded-xl p-5 shadow-sm">
-              <p className="text-sm text-gray-500 mb-1">Monthly Recurring</p>
-              <p className="text-2xl font-bold text-charcoal">{formatCents(summary.recurring?.mrr_cents || 0)}<span className="text-sm font-normal text-gray-400">/mo</span></p>
+              <p className="text-sm text-gray-500 mb-1">Active Recurring</p>
+              <p className="text-2xl font-bold text-charcoal">{formatCents(summary.recurring?.mrr_cents || 0)}<span className="text-sm font-normal text-gray-400">/mo equiv</span></p>
               <p className="text-xs text-gray-400">{summary.recurring?.active_count || 0} active</p>
             </div>
           </div>
@@ -145,7 +145,7 @@ export default function DashboardAdminDonations() {
                       <td className="px-4 py-3 text-charcoal font-medium">{d.donor_name}</td>
                       <td className="px-4 py-3 text-gray-500">{d.donor_email}</td>
                       <td className="px-4 py-3 font-semibold text-charcoal">{formatCents(d.amount_cents)}</td>
-                      <td className="px-4 py-3 text-gray-600">{d.type === 'recurring' ? 'Monthly' : 'One-time'}</td>
+                      <td className="px-4 py-3 text-gray-600">{d.type === 'recurring' ? 'Recurring' : 'One-time'}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${statusColors[d.status] || 'bg-gray-100'}`}>
                           {d.status}
