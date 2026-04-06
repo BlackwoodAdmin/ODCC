@@ -564,6 +564,70 @@ async function handleChargeRefunded(txClient, charge, now) {
 }
 
 // ============================================================
+// DELETE /api/donations/cancel-pending/:id (auth required)
+// ============================================================
+router.delete('/cancel-pending/:id', authenticateToken, async (req, res) => {
+  const donationId = parseInt(req.params.id);
+  if (!donationId || isNaN(donationId)) return res.status(400).json({ error: 'Invalid donation ID' });
+
+  try {
+    // Only allow canceling own pending donations
+    const result = await query(
+      `SELECT id, stripe_payment_intent_id, stripe_subscription_id FROM donations
+       WHERE id = $1 AND user_id = $2 AND status = 'pending'`,
+      [donationId, req.user.id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Pending donation not found' });
+    }
+
+    const donation = result.rows[0];
+    const now = Date.now();
+
+    // Cancel the Stripe subscription if it exists and is incomplete
+    if (stripe && donation.stripe_subscription_id) {
+      try {
+        const sub = await stripe.subscriptions.retrieve(donation.stripe_subscription_id);
+        if (['incomplete', 'incomplete_expired'].includes(sub.status)) {
+          await stripe.subscriptions.cancel(donation.stripe_subscription_id);
+        }
+      } catch (err) {
+        console.error('[Donations] Failed to cancel Stripe subscription:', err.message);
+      }
+
+      await query(
+        `UPDATE donation_subscriptions SET status = 'canceled', canceled_at = $1, updated_at = $1
+         WHERE stripe_subscription_id = $2 AND status IN ('incomplete', 'incomplete_expired')`,
+        [now, donation.stripe_subscription_id]
+      );
+    }
+
+    // Cancel the Stripe payment intent if it exists
+    if (stripe && donation.stripe_payment_intent_id) {
+      try {
+        await stripe.paymentIntents.cancel(donation.stripe_payment_intent_id);
+      } catch (err) {
+        // May already be canceled or in a non-cancelable state
+        if (err.code !== 'payment_intent_unexpected_state') {
+          console.error('[Donations] Failed to cancel payment intent:', err.message);
+        }
+      }
+    }
+
+    await query(
+      `UPDATE donations SET status = 'canceled', updated_at = $1 WHERE id = $2`,
+      [now, donationId]
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[Donations] cancel-pending error:', err.message);
+    res.status(500).json({ error: 'Failed to cancel donation' });
+  }
+});
+
+// ============================================================
 // GET /api/donations/my-donations (auth required)
 // ============================================================
 router.get('/my-donations', authenticateToken, async (req, res) => {

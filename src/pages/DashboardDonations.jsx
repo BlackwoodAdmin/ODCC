@@ -23,8 +23,22 @@ const statusColors = {
 };
 
 export default function DashboardDonations() {
-  const { data, loading, error } = useFetch('/donations/my-donations');
+  const { data, loading, error, refetch } = useFetch('/donations/my-donations');
   const [portalLoading, setPortalLoading] = useState(false);
+  const [cancelingId, setCancelingId] = useState(null);
+
+  const handleCancelPending = async (donationId) => {
+    if (!confirm('Cancel this pending donation?')) return;
+    setCancelingId(donationId);
+    try {
+      await api.delete(`/donations/cancel-pending/${donationId}`);
+      refetch();
+    } catch (err) {
+      alert(err.message || 'Failed to cancel donation');
+    } finally {
+      setCancelingId(null);
+    }
+  };
 
   const handleManageSubscription = async () => {
     setPortalLoading(true);
@@ -127,7 +141,19 @@ export default function DashboardDonations() {
                           {d.status}
                         </span>
                       </td>
-                      <td className="px-6 py-3 text-gray-500">{d.receipt_number || '—'}</td>
+                      <td className="px-6 py-3 text-gray-500">
+                        {d.status === 'pending' ? (
+                          <button
+                            onClick={() => handleCancelPending(d.id)}
+                            disabled={cancelingId === d.id}
+                            className="text-red-600 hover:text-red-700 text-xs font-semibold disabled:opacity-50"
+                          >
+                            {cancelingId === d.id ? 'Canceling...' : 'Cancel'}
+                          </button>
+                        ) : (
+                          d.receipt_number || '—'
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
