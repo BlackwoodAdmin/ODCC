@@ -104,9 +104,11 @@ function escapeHtml(str) {
     .replace(/'/g, '&#39;');
 }
 
-export async function sendDonationReceipt({ to, donorName, amount, receiptNumber, date, note, isRecurring }) {
+export async function sendDonationReceipt({ to, donorName, amount, receiptNumber, date, note, isRecurring, frequency }) {
   const safeName = escapeHtml(donorName);
   const safeNote = note ? escapeHtml(note) : null;
+  const freqLabel = frequency === 'week' ? 'weekly' : frequency === 'month' ? 'monthly' : (isRecurring ? 'recurring' : '');
+  const typeLabel = frequency === 'week' ? 'Weekly Recurring' : frequency === 'month' ? 'Monthly Recurring' : (isRecurring ? 'Recurring' : 'One-Time');
   const html = `
     <div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
       <div style="background:#7C9A72;padding:32px;border-radius:12px 12px 0 0;text-align:center;">
@@ -116,14 +118,14 @@ export async function sendDonationReceipt({ to, donorName, amount, receiptNumber
       <div style="background:#ffffff;padding:32px;border:1px solid #e5e7eb;border-top:none;">
         <h2 style="margin:0 0 16px;color:#1f2937;font-size:20px;">Thank you, ${safeName}!</h2>
         <p style="color:#4b5563;font-size:15px;line-height:1.6;">
-          Your generous ${isRecurring ? 'monthly ' : ''}donation has been received. God bless you for your faithfulness.
+          Your generous ${freqLabel ? freqLabel + ' ' : ''}donation has been received. God bless you for your faithfulness.
         </p>
         <div style="background:#f9fafb;border-radius:8px;padding:20px;margin:20px 0;">
           <table style="width:100%;border-collapse:collapse;">
             <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Amount</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-weight:600;font-size:16px;">$${amount}</td></tr>
             <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Date</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-size:14px;">${date}</td></tr>
             <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Receipt #</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-size:14px;">${receiptNumber}</td></tr>
-            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Type</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-size:14px;">${isRecurring ? 'Monthly Recurring' : 'One-Time'}</td></tr>
+            <tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Type</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-size:14px;">${typeLabel}</td></tr>
             ${safeNote ? `<tr><td style="padding:6px 0;color:#6b7280;font-size:14px;">Note</td><td style="padding:6px 0;text-align:right;color:#1f2937;font-size:14px;">${safeNote}</td></tr>` : ''}
           </table>
         </div>
@@ -143,8 +145,9 @@ export async function sendDonationReceipt({ to, donorName, amount, receiptNumber
   return sendEmail({ to, subject: `Donation Receipt ${receiptNumber} — Open Door Christian Church`, html });
 }
 
-export async function sendDonationFailedNotification({ to, donorName }) {
+export async function sendDonationFailedNotification({ to, donorName, frequency }) {
   const safeName = escapeHtml(donorName);
+  const freqLabel = frequency === 'week' ? 'weekly' : 'monthly';
   const portalUrl = `${SITE_URL}/dashboard/donations`;
   const html = `
     <div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -154,10 +157,10 @@ export async function sendDonationFailedNotification({ to, donorName }) {
       <div style="background:#ffffff;padding:32px;border:1px solid #e5e7eb;border-top:none;">
         <h2 style="margin:0 0 16px;color:#1f2937;font-size:20px;">Payment Update Needed</h2>
         <p style="color:#4b5563;font-size:15px;line-height:1.6;">
-          Hi ${safeName}, we were unable to process your monthly donation. This may be due to an expired or declined card.
+          Hi ${safeName}, we were unable to process your ${freqLabel} donation. This may be due to an expired or declined card.
         </p>
         <p style="color:#4b5563;font-size:15px;line-height:1.6;">
-          Please update your payment method to continue your monthly giving.
+          Please update your payment method to continue your ${freqLabel} giving.
         </p>
         <div style="text-align:center;margin:28px 0;">
           <a href="${portalUrl}" style="display:inline-block;background:#7C9A72;color:#ffffff;text-decoration:none;padding:14px 36px;border-radius:8px;font-weight:600;font-size:15px;">
@@ -170,7 +173,7 @@ export async function sendDonationFailedNotification({ to, donorName }) {
       </div>
     </div>
   `;
-  return sendEmail({ to, subject: 'Action Needed: Monthly Donation Payment Failed', html });
+  return sendEmail({ to, subject: `Action Needed: ${freqLabel.charAt(0).toUpperCase() + freqLabel.slice(1)} Donation Payment Failed`, html });
 }
 
 export async function sendWelcomeEmail(to, name) {

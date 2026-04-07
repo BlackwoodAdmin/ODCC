@@ -363,6 +363,13 @@ async function handlePaymentIntentSucceeded(txClient, pi, now) {
       'UPDATE donations SET receipt_number = $1, receipt_sent = FALSE WHERE id = $2',
       [receiptNumber, donation.id]
     );
+    // Look up subscription interval for receipt
+    const subscriptionId = meta.subscription_id || dbRow?.stripe_subscription_id || null;
+    let frequency = null;
+    if (subscriptionId) {
+      const subRow = await txClient.query('SELECT "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1', [subscriptionId]);
+      frequency = subRow.rows[0]?.interval || null;
+    }
     // Send receipt after commit (best effort)
     if (donorEmail) {
       setImmediate(() => {
@@ -374,6 +381,7 @@ async function handlePaymentIntentSucceeded(txClient, pi, now) {
           date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
           note,
           isRecurring: type === 'recurring',
+          frequency,
         }).then(sent => {
           if (sent) query('UPDATE donations SET receipt_sent = TRUE WHERE id = $1', [donation.id]);
         }).catch(() => {});
@@ -437,20 +445,25 @@ async function handleInvoicePaymentPaid(txClient, invoicePayment, now) {
     if (!donation.receipt_number) {
       const receiptNumber = generateReceiptNumber(donation.id);
       await txClient.query('UPDATE donations SET receipt_number = $1, receipt_sent = FALSE WHERE id = $2', [receiptNumber, donation.id]);
+      let frequency = null;
+      if (row.stripe_subscription_id) {
+        const subRow = await txClient.query('SELECT "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1', [row.stripe_subscription_id]);
+        frequency = subRow.rows[0]?.interval || null;
+      }
       if (row.donor_email) {
         setImmediate(() => {
           sendDonationReceipt({
             to: row.donor_email, donorName: row.donor_name,
             amount: (finalAmount / 100).toFixed(2), receiptNumber,
             date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-            note: null, isRecurring: !!row.stripe_subscription_id,
+            note: null, isRecurring: !!row.stripe_subscription_id, frequency,
           }).then(sent => { if (sent) query('UPDATE donations SET receipt_sent = TRUE WHERE id = $1', [donation.id]); }).catch(() => {});
         });
       }
     }
   } else {
-    // No existing row — subsequent monthly payment. Look up subscription info via invoice.
-    let donorName = 'Anonymous', donorEmail = '', userId = null, subscriptionId = null;
+    // No existing row — subsequent recurring payment. Look up subscription info via invoice.
+    let donorName = 'Anonymous', donorEmail = '', userId = null, subscriptionId = null, frequency = null;
 
     if (invoicePayment.invoice) {
       try {
@@ -458,13 +471,14 @@ async function handleInvoicePaymentPaid(txClient, invoicePayment, now) {
         subscriptionId = getSubscriptionIdFromInvoice(inv);
         if (subscriptionId) {
           const subRow = await txClient.query(
-            'SELECT donor_name, donor_email, user_id, stripe_customer_id FROM donation_subscriptions WHERE stripe_subscription_id = $1',
+            'SELECT donor_name, donor_email, user_id, stripe_customer_id, "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1',
             [subscriptionId]
           );
           if (subRow.rows.length > 0) {
             donorName = subRow.rows[0].donor_name;
             donorEmail = subRow.rows[0].donor_email;
             userId = subRow.rows[0].user_id;
+            frequency = subRow.rows[0].interval;
           }
         }
       } catch (e) {
@@ -489,7 +503,7 @@ async function handleInvoicePaymentPaid(txClient, invoicePayment, now) {
           to: donorEmail, donorName,
           amount: (amountCents / 100).toFixed(2), receiptNumber,
           date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-          note: null, isRecurring: true,
+          note: null, isRecurring: true, frequency,
         }).then(sent => { if (sent) query('UPDATE donations SET receipt_sent = TRUE WHERE id = $1', [donation.id]); }).catch(() => {});
       });
     }
@@ -508,7 +522,7 @@ async function handleInvoicePaymentFailed(txClient, invoice, now) {
 
   // Notify donor
   const subRow = await txClient.query(
-    'SELECT donor_name, donor_email FROM donation_subscriptions WHERE stripe_subscription_id = $1',
+    'SELECT donor_name, donor_email, "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1',
     [subscriptionId]
   );
   if (subRow.rows.length > 0 && subRow.rows[0].donor_email) {
@@ -516,6 +530,7 @@ async function handleInvoicePaymentFailed(txClient, invoice, now) {
       sendDonationFailedNotification({
         to: subRow.rows[0].donor_email,
         donorName: subRow.rows[0].donor_name,
+        frequency: subRow.rows[0].interval,
       }).catch(() => {});
     });
   }
