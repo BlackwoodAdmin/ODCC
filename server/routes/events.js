@@ -16,11 +16,11 @@ function fmtDate(d) {
 }
 
 function getNthDayOfMonth(year, month, dayOfWeek, n) {
-  const first = new Date(year, month, 1);
-  let day = 1 + ((dayOfWeek - first.getDay() + 7) % 7);
+  const first = new Date(Date.UTC(year, month, 1));
+  let day = 1 + ((dayOfWeek - first.getUTCDay() + 7) % 7);
   day += (n - 1) * 7;
-  const result = new Date(year, month, day);
-  if (result.getMonth() !== month) return null;
+  const result = new Date(Date.UTC(year, month, day));
+  if (result.getUTCMonth() !== month) return null;
   return result;
 }
 
@@ -32,8 +32,8 @@ function expandRecurringEvents(events, startDate, endDate) {
   for (const event of events) {
     if (event.recurrence === 'weekly' && event.day_of_week !== null) {
       const d = new Date(start);
-      while (d.getDay() !== event.day_of_week && d <= end) {
-        d.setDate(d.getDate() + 1);
+      while (d.getUTCDay() !== event.day_of_week && d <= end) {
+        d.setUTCDate(d.getUTCDate() + 1);
       }
       while (d <= end) {
         expanded.push({
@@ -41,13 +41,13 @@ function expandRecurringEvents(events, startDate, endDate) {
           event_date: fmtDate(d),
           _occurrence: true,
         });
-        d.setDate(d.getDate() + 7);
+        d.setUTCDate(d.getUTCDate() + 7);
       }
     } else if (event.recurrence === 'monthly' && event.day_of_week !== null && event.week_of_month !== null) {
-      let y = start.getFullYear();
-      let m = start.getMonth();
-      const endY = end.getFullYear();
-      const endM = end.getMonth();
+      let y = start.getUTCFullYear();
+      let m = start.getUTCMonth();
+      const endY = end.getUTCFullYear();
+      const endM = end.getUTCMonth();
       while (y < endY || (y === endY && m <= endM)) {
         const d = getNthDayOfMonth(y, m, event.day_of_week, event.week_of_month);
         if (d && d >= start && d <= end) {
@@ -91,21 +91,21 @@ router.get('/', async (req, res) => {
 
     if (days) {
       const today = todayET();
-      const startDate = new Date(today + 'T00:00:00');
+      const startDate = new Date(today + 'T00:00:00Z');
       const endDate = new Date(startDate);
-      endDate.setDate(endDate.getDate() + parseInt(days));
+      endDate.setUTCDate(endDate.getUTCDate() + parseInt(days));
       startStr = today;
       endStr = fmtDate(endDate);
     } else {
       const now = new Date();
       const m = parseInt(month) || (now.getMonth() + 1);
       const y = parseInt(year) || now.getFullYear();
-      const firstOfMonth = new Date(y, m - 1, 1);
-      const lastOfMonth = new Date(y, m, 0);
+      const firstOfMonth = new Date(Date.UTC(y, m - 1, 1));
+      const lastOfMonth = new Date(Date.UTC(y, m, 0));
       const startDate = new Date(firstOfMonth);
-      startDate.setDate(startDate.getDate() - startDate.getDay());
+      startDate.setUTCDate(startDate.getUTCDate() - startDate.getUTCDay());
       const endDate = new Date(lastOfMonth);
-      endDate.setDate(endDate.getDate() + (6 - endDate.getDay()));
+      endDate.setUTCDate(endDate.getUTCDate() + (6 - endDate.getUTCDay()));
       startStr = fmtDate(startDate);
       endStr = fmtDate(endDate);
     }

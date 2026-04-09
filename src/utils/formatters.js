@@ -2,6 +2,13 @@ const TZ = 'America/New_York';
 
 export function formatDate(dateInput) {
   if (!dateInput) return '';
+  // Date-only strings (YYYY-MM-DD) represent calendar dates, not instants —
+  // parse as local date to avoid UTC-midnight-to-ET shift dropping a day
+  if (typeof dateInput === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+    const [y, m, d] = dateInput.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+  // Timestamps — convert to ET
   const timestamp = typeof dateInput === 'string' && /^\d+$/.test(dateInput) ? parseInt(dateInput) : dateInput;
   return new Date(timestamp).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: TZ });
 }
