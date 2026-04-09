@@ -54,7 +54,9 @@ app.use(express.json({
     }
   },
 }));
-app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'public', 'uploads'), {
+  maxAge: '1d',
+}));
 
 // Ensure data directories exist
 const dataDir = process.env.DATA_DIR || path.join(process.cwd(), 'data');
@@ -77,6 +79,12 @@ app.use('/api/ai', (req, res, next) => {
       console.log(`[AI:FIN] ${req.method} ${req.originalUrl} → ${res.statusCode} (${Date.now() - start}ms)`);
     }
   });
+  next();
+});
+
+// Cache-Control: never cache API responses
+app.use('/api', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
   next();
 });
 
@@ -109,9 +117,22 @@ app.use('/api/email', emailAdminLogRoutes);
 app.use('/api/donations', requireOriginCheck, donationRoutes);
 
 // Serve public/ for AI-generated images and other static assets
-app.use(express.static(path.join(__dirname, '..', 'public')));
+app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d' }));
 const distPath = path.join(__dirname, '..', 'dist');
-app.use(express.static(distPath));
+
+// Hashed Vite assets (js/css) — immutable, cache forever
+app.use('/assets', express.static(path.join(distPath, 'assets'), {
+  maxAge: '1y',
+  immutable: true,
+}));
+
+// Other dist files (index.html, etc.) — always revalidate
+app.use(express.static(distPath, {
+  maxAge: 0,
+  setHeaders: (res) => {
+    res.set('Cache-Control', 'no-cache');
+  },
+}));
 
 // Read index.html template once at startup for blog OGP injection
 const indexHtml = fs.readFileSync(path.join(distPath, 'index.html'), 'utf-8');
@@ -124,6 +145,8 @@ app.get('/blog/:slug', async (req, res) => {
       'SELECT title, excerpt, featured_image FROM posts WHERE slug = $1 AND status = $2',
       [slug, 'published']
     );
+
+    res.set('Cache-Control', 'no-cache');
 
     if (result.rows.length === 0) {
       return res.type('html').send(indexHtml);
@@ -176,6 +199,7 @@ app.get('/blog/:slug', async (req, res) => {
 
 // Catch-all route for SPA
 app.get('*', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
   res.sendFile(path.join(distPath, 'index.html'));
 });
 
