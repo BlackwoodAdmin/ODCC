@@ -63,7 +63,7 @@ export default function Footer() {
               <p className="mt-2 font-medium text-cream">Wednesday</p>
               <p>6:00 PM · Bible Study</p>
               <p className="mt-3 font-medium text-cream">Office Hours</p>
-              <p>Tues – Thurs · 9:00 AM – 1:00 PM</p>
+              <p>Tues – Fri · 9:00 AM – 2:00 PM</p>
             </div>
           </div>
 
