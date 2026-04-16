@@ -338,6 +338,11 @@ async function handlePaymentIntentSucceeded(txClient, pi, now) {
   );
   const dbRow = existingRow.rows[0];
 
+  // Subscription payments are recorded exclusively via invoice_payment.paid.
+  // Early-return here prevents creating anonymous rows on renewals (where meta
+  // and dbRow are both empty) and avoids a redundant write on first payments.
+  if (meta.type === 'recurring' || dbRow?.stripe_subscription_id) return;
+
   const donorName = meta.donor_name || dbRow?.donor_name || 'Anonymous';
   const donorEmail = meta.donor_email || dbRow?.donor_email || '';
   const userId = meta.user_id ? parseInt(meta.user_id) : (dbRow?.user_id || null);
@@ -429,69 +434,106 @@ async function handleInvoicePaymentPaid(txClient, invoicePayment, now) {
 
   // Check if donation row already exists (created during create-payment-intent for first payment)
   const existing = await txClient.query(
-    'SELECT id, stripe_subscription_id, donor_name, donor_email, user_id, amount_cents FROM donations WHERE stripe_payment_intent_id = $1',
+    'SELECT id, stripe_subscription_id, stripe_customer_id, donor_name, donor_email, user_id, amount_cents FROM donations WHERE stripe_payment_intent_id = $1',
     [piId]
   );
 
   if (existing.rows.length > 0) {
-    // Row exists — update to completed
+    // Row exists — update to completed, and reconcile donor info if row is anonymous
+    // (handles mid-deploy window where payment_intent.succeeded created a bare row).
     const row = existing.rows[0];
     const finalAmount = amountCents || row.amount_cents;
-    const result = await txClient.query(
-      `UPDATE donations SET status = 'completed', amount_cents = $1, currency = $2, updated_at = $3 WHERE id = $4 RETURNING id, receipt_number`,
-      [finalAmount, currency, now, row.id]
-    );
+
+    const isAnonymous = !row.user_id || row.donor_name === 'Anonymous' || !row.donor_email;
+    let reconciled = null;
+    if (isAnonymous && invoicePayment.invoice) {
+      const inv = await stripe.invoices.retrieve(invoicePayment.invoice);
+      const subscriptionId = getSubscriptionIdFromInvoice(inv);
+      if (subscriptionId) {
+        const subRow = await txClient.query(
+          'SELECT donor_name, donor_email, user_id, stripe_customer_id, "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1',
+          [subscriptionId]
+        );
+        if (subRow.rows.length > 0) {
+          reconciled = { ...subRow.rows[0], subscriptionId };
+        }
+      }
+    }
+
+    let result;
+    if (reconciled) {
+      result = await txClient.query(
+        `UPDATE donations SET status = 'completed', amount_cents = $1, currency = $2, updated_at = $3,
+           donor_name = $4, donor_email = $5, user_id = $6, type = 'recurring',
+           stripe_subscription_id = $7, stripe_customer_id = COALESCE(stripe_customer_id, $8)
+         WHERE id = $9 RETURNING id, receipt_number`,
+        [finalAmount, currency, now, reconciled.donor_name, reconciled.donor_email, reconciled.user_id, reconciled.subscriptionId, reconciled.stripe_customer_id, row.id]
+      );
+    } else {
+      result = await txClient.query(
+        `UPDATE donations SET status = 'completed', amount_cents = $1, currency = $2, updated_at = $3 WHERE id = $4 RETURNING id, receipt_number`,
+        [finalAmount, currency, now, row.id]
+      );
+    }
+
     const donation = result.rows[0];
     if (!donation.receipt_number) {
       const receiptNumber = generateReceiptNumber(donation.id);
       await txClient.query('UPDATE donations SET receipt_number = $1, receipt_sent = FALSE WHERE id = $2', [receiptNumber, donation.id]);
-      let frequency = null;
-      if (row.stripe_subscription_id) {
-        const subRow = await txClient.query('SELECT "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1', [row.stripe_subscription_id]);
+
+      const effectiveEmail = reconciled?.donor_email || row.donor_email;
+      const effectiveName = reconciled?.donor_name || row.donor_name;
+      const effectiveSubId = reconciled?.subscriptionId || row.stripe_subscription_id;
+      let frequency = reconciled?.interval || null;
+      if (!frequency && effectiveSubId) {
+        const subRow = await txClient.query('SELECT "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1', [effectiveSubId]);
         frequency = subRow.rows[0]?.interval || null;
       }
-      if (row.donor_email) {
+      if (effectiveEmail) {
         setImmediate(() => {
           sendDonationReceipt({
-            to: row.donor_email, donorName: row.donor_name,
+            to: effectiveEmail, donorName: effectiveName,
             amount: (finalAmount / 100).toFixed(2), receiptNumber,
             date: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
-            note: null, isRecurring: !!row.stripe_subscription_id, frequency,
+            note: null, isRecurring: !!effectiveSubId, frequency,
           }).then(sent => { if (sent) query('UPDATE donations SET receipt_sent = TRUE WHERE id = $1', [donation.id]); }).catch(() => {});
         });
       }
     }
   } else {
     // No existing row — subsequent recurring payment. Look up subscription info via invoice.
-    let donorName = 'Anonymous', donorEmail = '', userId = null, subscriptionId = null, frequency = null;
+    let donorName = 'Anonymous', donorEmail = '', userId = null, subscriptionId = null, frequency = null, customerId = null;
 
     if (invoicePayment.invoice) {
-      try {
-        const inv = await stripe.invoices.retrieve(invoicePayment.invoice);
-        subscriptionId = getSubscriptionIdFromInvoice(inv);
-        if (subscriptionId) {
-          const subRow = await txClient.query(
-            'SELECT donor_name, donor_email, user_id, stripe_customer_id, "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1',
-            [subscriptionId]
-          );
-          if (subRow.rows.length > 0) {
-            donorName = subRow.rows[0].donor_name;
-            donorEmail = subRow.rows[0].donor_email;
-            userId = subRow.rows[0].user_id;
-            frequency = subRow.rows[0].interval;
-          }
+      // Let errors propagate: transaction rolls back, Stripe retries the webhook.
+      // Better than silently inserting an anonymous row.
+      const inv = await stripe.invoices.retrieve(invoicePayment.invoice);
+      subscriptionId = getSubscriptionIdFromInvoice(inv);
+      if (subscriptionId) {
+        const subRow = await txClient.query(
+          'SELECT donor_name, donor_email, user_id, stripe_customer_id, "interval" FROM donation_subscriptions WHERE stripe_subscription_id = $1',
+          [subscriptionId]
+        );
+        if (subRow.rows.length > 0) {
+          donorName = subRow.rows[0].donor_name;
+          donorEmail = subRow.rows[0].donor_email;
+          userId = subRow.rows[0].user_id;
+          customerId = subRow.rows[0].stripe_customer_id;
+          frequency = subRow.rows[0].interval;
+        } else {
+          // Orphan: subscription exists in Stripe but not in our donation_subscriptions
+          // (e.g., imported from Stripe dashboard). Row will be inserted as anonymous.
+          console.warn(`[Donations] invoice_payment.paid: no donation_subscriptions row for ${subscriptionId} — inserting anonymous donation`);
         }
-      } catch (e) {
-        console.error('[Donations] Failed to fetch invoice for invoice_payment.paid:', e.message);
       }
     }
 
     const result = await txClient.query(
-      `INSERT INTO donations (stripe_payment_intent_id, stripe_subscription_id, donor_name, donor_email, user_id, amount_cents, currency, type, status, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'recurring', 'completed', $8, $8)
+      `INSERT INTO donations (stripe_payment_intent_id, stripe_subscription_id, stripe_customer_id, donor_name, donor_email, user_id, amount_cents, currency, type, status, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'recurring', 'completed', $9, $9)
        ON CONFLICT (stripe_payment_intent_id) DO UPDATE SET status = 'completed', amount_cents = EXCLUDED.amount_cents, updated_at = EXCLUDED.updated_at
        RETURNING id, receipt_number`,
-      [piId, subscriptionId, donorName, donorEmail, userId, amountCents, currency, now]
+      [piId, subscriptionId, customerId, donorName, donorEmail, userId, amountCents, currency, now]
     );
 
     const donation = result.rows[0];
