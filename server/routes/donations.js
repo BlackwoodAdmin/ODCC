@@ -64,7 +64,7 @@ const AMOUNT_REGEX = /^\d+(\.\d{1,2})?$/;
 
 const VALID_INTERVALS = ['week', 'month'];
 
-function validateDonationInput({ amount, type, name, email, note, frequency }) {
+export function validateDonationInput({ amount, type, name, email, note, frequency }) {
   const errors = [];
   if (!amount || !AMOUNT_REGEX.test(String(amount))) {
     errors.push('Amount must be a valid dollar amount (e.g. 50 or 50.00)');
@@ -98,13 +98,13 @@ function validateDonationInput({ amount, type, name, email, note, frequency }) {
 }
 
 // --- Generate receipt number ---
-function generateReceiptNumber(donationId) {
+export function generateReceiptNumber(donationId) {
   const year = new Date().getFullYear();
   return `ODCC-${year}-${String(donationId).padStart(6, '0')}`;
 }
 
 // --- Helper: extract subscription ID from invoice parent (Stripe API 2025+) ---
-function getSubscriptionIdFromInvoice(invoice) {
+export function getSubscriptionIdFromInvoice(invoice) {
   return invoice.parent?.subscription_details?.subscription || null;
 }
 
@@ -262,7 +262,7 @@ router.post('/webhook', async (req, res) => {
   return res.status(200).json({ received: true });
 });
 
-async function processWebhookEvent(event) {
+export async function processWebhookEvent(event) {
   const now = Date.now();
 
   // Transactional idempotency: insert event + process in one transaction

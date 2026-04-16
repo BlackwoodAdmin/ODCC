@@ -3,6 +3,8 @@ dist/
 data/
 public/uploads/
 .env
+.env.test
+DONATION_ANONYMOUS_FIX_PLAN.md
 PLAN-*.md
 CLAUDE.md
 package-lock.json
