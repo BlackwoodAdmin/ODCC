@@ -65,8 +65,8 @@ export default function ForgotPassword() {
                 />
               </div>
               <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
-              <button type="submit" disabled={loading} className="btn-primary w-full !py-4">
-                {loading ? 'Sending...' : 'Send Reset Link'}
+              <button type="submit" disabled={loading || !turnstileToken} className="btn-primary w-full !py-4">
+                {loading ? 'Sending...' : !turnstileToken ? 'Verifying...' : 'Send Reset Link'}
               </button>
               <p className="text-center text-gray-500">
                 Remember your password? <Link to="/login" className="text-sage font-semibold hover:underline">Sign In</Link>

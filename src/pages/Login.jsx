@@ -55,7 +55,7 @@ export default function Login() {
               <Link to="/forgot-password" className="text-sm text-sage hover:underline">Forgot your password?</Link>
             </div>
             <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
-            <button type="submit" disabled={loading} className="btn-primary w-full !py-4">{loading ? 'Signing in...' : 'Sign In'}</button>
+            <button type="submit" disabled={loading || !turnstileToken} className="btn-primary w-full !py-4">{loading ? 'Signing in...' : !turnstileToken ? 'Verifying...' : 'Sign In'}</button>
           </form>
           <p className="text-center text-gray-500 mt-6">Don't have an account? <Link to="/register" className="text-sage font-semibold hover:underline">Register</Link></p>
         </div>

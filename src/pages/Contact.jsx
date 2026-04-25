@@ -59,7 +59,7 @@ export default function Contact() {
                   <textarea value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} rows={5} required className="w-full border border-gray-200 rounded-lg px-4 py-3 resize-none" />
                 </div>
                 <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
-                <button type="submit" disabled={submitting} className="btn-primary w-full !py-4">{submitting ? 'Sending...' : 'Send Message'}</button>
+                <button type="submit" disabled={submitting || !turnstileToken} className="btn-primary w-full !py-4">{submitting ? 'Sending...' : !turnstileToken ? 'Verifying...' : 'Send Message'}</button>
               </form>
             </div>
 

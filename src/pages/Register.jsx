@@ -65,7 +65,7 @@ export default function Register() {
               <input type="password" value={form.confirm} onChange={e => setForm({ ...form, confirm: e.target.value })} required className="w-full border border-gray-200 rounded-lg px-4 py-3" />
             </div>
             <Turnstile onToken={setTurnstileToken} resetKey={turnstileReset} />
-            <button type="submit" disabled={loading} className="btn-primary w-full !py-4">{loading ? (isSetup ? 'Setting up...' : 'Creating...') : (isSetup ? 'Set Password' : 'Create Account')}</button>
+            <button type="submit" disabled={loading || !turnstileToken} className="btn-primary w-full !py-4">{loading ? (isSetup ? 'Setting up...' : 'Creating...') : !turnstileToken ? 'Verifying...' : (isSetup ? 'Set Password' : 'Create Account')}</button>
           </form>
           <p className="text-center text-gray-500 mt-6">Already have an account? <Link to="/login" className="text-sage font-semibold hover:underline">Sign In</Link></p>
         </div>
