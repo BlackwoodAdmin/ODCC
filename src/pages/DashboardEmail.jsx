@@ -1265,7 +1265,7 @@ export default function DashboardEmail() {
               <MessageViewer
                 accountId={accountId}
                 messageId={viewingMessageId}
-                onClose={() => setViewingMessageId(null)}
+                onClose={() => { setViewingMessageId(null); refetchMessages(); refetchFolders(); }}
                 onCompose={(prefill) => openCompose(prefill)}
                 onRefresh={() => { refetchMessages(); refetchFolders(); }}
               />
