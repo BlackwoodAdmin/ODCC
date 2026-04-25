@@ -83,6 +83,7 @@ function PaymentStep({ amount, frequencyLabel, onSuccess, onBack }) {
 export default function DonationForm() {
   const { user } = useAuth();
   const formRef = useRef(null);
+  const isFirstRender = useRef(true);
   const [step, setStep] = useState('details'); // details | payment | success
   const [amount, setAmount] = useState('');
   const [type, setType] = useState('one_time');
@@ -96,6 +97,10 @@ export default function DonationForm() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [step]);
 
@@ -141,7 +146,7 @@ export default function DonationForm() {
 
   if (step === 'success') {
     return (
-      <div ref={formRef} className="text-center py-8">
+      <div ref={formRef} className="text-center py-8 scroll-mt-24">
         <div className="text-6xl mb-4">🙏</div>
         <h3 className="text-2xl font-bold text-charcoal mb-3">Thank You for Your Generous Gift!</h3>
         <p className="text-gray-600 mb-2">Your donation has been received. A receipt has been sent to your email.</p>
@@ -160,7 +165,7 @@ export default function DonationForm() {
 
   if (step === 'payment' && clientSecret) {
     return (
-      <div ref={formRef}>
+      <div ref={formRef} className="scroll-mt-24">
       <StripeProvider clientSecret={clientSecret}>
         <PaymentStep
           amount={Number(amount).toFixed(2)}
@@ -174,7 +179,7 @@ export default function DonationForm() {
   }
 
   return (
-    <form ref={formRef} onSubmit={handleContinue}>
+    <form ref={formRef} onSubmit={handleContinue} className="scroll-mt-24">
       {/* Amount */}
       <div className="mb-6">
         <label className="block text-sm font-semibold text-charcoal mb-2">Donation Amount</label>
