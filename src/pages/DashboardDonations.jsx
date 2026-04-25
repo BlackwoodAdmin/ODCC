@@ -26,6 +26,34 @@ export default function DashboardDonations() {
   const { data, loading, error, refetch } = useFetch('/donations/my-donations');
   const [portalLoading, setPortalLoading] = useState(false);
   const [cancelingId, setCancelingId] = useState(null);
+  const [downloadingId, setDownloadingId] = useState(null);
+
+  const handleDownloadReceipt = async (donation) => {
+    setDownloadingId(donation.id);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`/api/donations/receipt/${donation.id}/pdf`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt-${donation.receipt_number}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message || 'Failed to download receipt');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const handleCancelPending = async (donationId) => {
     if (!confirm('Cancel this pending donation?')) return;
@@ -149,6 +177,15 @@ export default function DashboardDonations() {
                             className="text-red-600 hover:text-red-700 text-xs font-semibold disabled:opacity-50"
                           >
                             {cancelingId === d.id ? 'Canceling...' : 'Cancel'}
+                          </button>
+                        ) : d.receipt_number && d.status === 'completed' ? (
+                          <button
+                            onClick={() => handleDownloadReceipt(d)}
+                            disabled={downloadingId === d.id}
+                            className="text-sage hover:underline font-mono disabled:opacity-50"
+                            title="Download PDF receipt"
+                          >
+                            {downloadingId === d.id ? 'Downloading...' : d.receipt_number}
                           </button>
                         ) : (
                           d.receipt_number || '—'

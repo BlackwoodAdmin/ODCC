@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import Stripe from 'stripe';
+import PDFDocument from 'pdfkit';
 import { query, pool } from '../db.js';
 import { authenticateToken, optionalAuth, requireRole } from '../middleware/auth.js';
 import { requireTurnstile } from '../middleware/turnstile.js';
@@ -732,6 +733,118 @@ router.get('/my-donations', authenticateToken, async (req, res) => {
   } catch (err) {
     console.error('[Donations] my-donations error:', err.message);
     res.status(500).json({ error: 'Failed to fetch donations' });
+  }
+});
+
+// ============================================================
+// GET /api/donations/receipt/:id/pdf  (auth required)
+// Returns a PDF receipt for a single completed donation owned by the user.
+// ============================================================
+router.get('/receipt/:id/pdf', authenticateToken, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (isNaN(id)) return res.status(400).json({ error: 'Invalid donation id' });
+
+    const result = await query(
+      `SELECT d.id, d.amount_cents, d.currency, d.type, d.status, d.receipt_number,
+              d.donor_name, d.donor_email, d.note, d.created_at,
+              s."interval" AS subscription_interval
+       FROM donations d
+       LEFT JOIN donation_subscriptions s ON s.id = d.subscription_id
+       WHERE d.id = $1 AND (d.user_id = $2 OR d.donor_email = $3)`,
+      [id, req.user.id, req.user.email]
+    );
+    if (!result.rows.length) return res.status(404).json({ error: 'Receipt not found' });
+
+    const d = result.rows[0];
+    if (d.status !== 'completed' || !d.receipt_number) {
+      return res.status(400).json({ error: 'Receipt is only available for completed donations' });
+    }
+
+    const amount = (Number(d.amount_cents) / 100).toFixed(2);
+    const date = new Date(Number(d.created_at)).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'long', day: 'numeric',
+    });
+    const isRecurring = d.type === 'recurring';
+    const typeLabel = d.subscription_interval === 'week' ? 'Weekly Recurring'
+                    : d.subscription_interval === 'month' ? 'Monthly Recurring'
+                    : isRecurring ? 'Recurring' : 'One-Time';
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="receipt-${d.receipt_number}.pdf"`);
+
+    const doc = new PDFDocument({ size: 'LETTER', margin: 60 });
+    doc.pipe(res);
+
+    // Header band
+    doc.rect(0, 0, doc.page.width, 110).fill('#7C9A72');
+    doc.fillColor('#ffffff').fontSize(22).font('Helvetica-Bold')
+       .text('Open Door Christian Church', 60, 38, { width: doc.page.width - 120 });
+    doc.fontSize(12).font('Helvetica')
+       .text('Donation Receipt', 60, 70, { width: doc.page.width - 120 });
+
+    doc.fillColor('#1f2937').font('Helvetica').fontSize(11);
+    let y = 150;
+
+    doc.font('Helvetica-Bold').fontSize(16).text(`Thank you, ${d.donor_name || 'Friend'}!`, 60, y);
+    y += 30;
+    doc.font('Helvetica').fontSize(11).fillColor('#4b5563')
+       .text('Your generous donation has been received. God bless you for your faithfulness.',
+             60, y, { width: doc.page.width - 120 });
+    y += 40;
+
+    // Details table
+    const rowHeight = 26;
+    const labelX = 60;
+    const valueX = doc.page.width - 60;
+    const tableTop = y;
+
+    const rows = [
+      ['Receipt Number', d.receipt_number],
+      ['Date', date],
+      ['Amount', `$${amount} ${(d.currency || 'usd').toUpperCase()}`],
+      ['Type', typeLabel],
+      ['Donor', d.donor_name || ''],
+      ['Email', d.donor_email || ''],
+    ];
+    if (d.note) rows.push(['Note', d.note]);
+
+    doc.rect(50, tableTop - 10, doc.page.width - 100, rows.length * rowHeight + 20)
+       .fill('#f9fafb');
+
+    rows.forEach(([label, value], i) => {
+      const rowY = tableTop + i * rowHeight;
+      doc.fillColor('#6b7280').font('Helvetica').fontSize(10).text(label, labelX, rowY);
+      doc.fillColor('#1f2937').font('Helvetica-Bold').fontSize(11)
+         .text(String(value), labelX + 110, rowY, {
+           width: valueX - labelX - 110,
+           align: 'right',
+         });
+    });
+
+    y = tableTop + rows.length * rowHeight + 30;
+
+    // Tax notice
+    doc.rect(50, y, doc.page.width - 100, 70).fill('#f0fdf4').stroke('#bbf7d0');
+    doc.fillColor('#166534').font('Helvetica-Bold').fontSize(11)
+       .text('Tax Deduction Notice', 60, y + 12);
+    doc.font('Helvetica').fontSize(10)
+       .text(
+         'Open Door Christian Church is a 501(c)(3) tax-exempt organization. No goods or services were provided in exchange for this contribution. This receipt may be used for tax deduction purposes.',
+         60, y + 30, { width: doc.page.width - 120 },
+       );
+    y += 90;
+
+    // Footer
+    doc.fillColor('#6b7280').font('Helvetica-Bold').fontSize(10)
+       .text('Open Door Christian Church', 60, doc.page.height - 90, { align: 'center', width: doc.page.width - 120 });
+    doc.font('Helvetica').fontSize(9).fillColor('#9ca3af')
+       .text('1700 S Clara Ave, DeLand, FL 32720', 60, doc.page.height - 75, { align: 'center', width: doc.page.width - 120 });
+
+    doc.end();
+  } catch (err) {
+    console.error('[Donations] receipt PDF error:', err.message);
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate receipt' });
   }
 });
 
