@@ -369,27 +369,30 @@ router.get('/accounts/:id/messages', async (req, res) => {
       const total = parseInt(countResult.rows[0].total, 10);
 
       const messagesResult = await query(
-        `SELECT DISTINCT ON (COALESCE(m.thread_id, m.message_id, m.id::text))
-                m.id, m.folder_id, m.message_id, m.thread_id,
-                m.from_address, m.from_name, m.to_addresses, m.cc_addresses,
-                m.subject, m.is_read, m.is_starred, m.is_draft, m.priority,
-                m.size_bytes, m.direction, m.send_status,
-                m.sent_at, m.received_at, m.created_at, m.updated_at,
-                f.name AS folder_name, f.type AS folder_type,
-                (SELECT COUNT(*) FROM email_messages m2
-                 WHERE m2.account_id = m.account_id
-                   AND COALESCE(m2.thread_id, m2.message_id, m2.id::text) = COALESCE(m.thread_id, m.message_id, m.id::text)
-                ) AS thread_count,
-                (SELECT COUNT(*) FROM email_messages m3
-                 WHERE m3.account_id = m.account_id
-                   AND COALESCE(m3.thread_id, m3.message_id, m3.id::text) = COALESCE(m.thread_id, m.message_id, m.id::text)
-                   AND m3.is_read = FALSE
-                ) AS thread_unread
-         FROM email_messages m
-         LEFT JOIN email_folders f ON f.id = m.folder_id
-         WHERE ${where}
-         ORDER BY COALESCE(m.thread_id, m.message_id, m.id::text),
-                  COALESCE(m.received_at, m.created_at) DESC
+        `SELECT * FROM (
+           SELECT DISTINCT ON (COALESCE(m.thread_id, m.message_id, m.id::text))
+                  m.id, m.folder_id, m.message_id, m.thread_id,
+                  m.from_address, m.from_name, m.to_addresses, m.cc_addresses,
+                  m.subject, m.is_read, m.is_starred, m.is_draft, m.priority,
+                  m.size_bytes, m.direction, m.send_status,
+                  m.sent_at, m.received_at, m.created_at, m.updated_at,
+                  f.name AS folder_name, f.type AS folder_type,
+                  (SELECT COUNT(*) FROM email_messages m2
+                   WHERE m2.account_id = m.account_id
+                     AND COALESCE(m2.thread_id, m2.message_id, m2.id::text) = COALESCE(m.thread_id, m.message_id, m.id::text)
+                  ) AS thread_count,
+                  (SELECT COUNT(*) FROM email_messages m3
+                   WHERE m3.account_id = m.account_id
+                     AND COALESCE(m3.thread_id, m3.message_id, m3.id::text) = COALESCE(m.thread_id, m.message_id, m.id::text)
+                     AND m3.is_read = FALSE
+                  ) AS thread_unread
+           FROM email_messages m
+           LEFT JOIN email_folders f ON f.id = m.folder_id
+           WHERE ${where}
+           ORDER BY COALESCE(m.thread_id, m.message_id, m.id::text),
+                    COALESCE(m.received_at, m.created_at) DESC
+         ) t
+         ORDER BY COALESCE(t.received_at, t.created_at) DESC
          LIMIT $${paramIdx} OFFSET $${paramIdx + 1}`,
         [...params, limit, offset]
       );

@@ -1092,7 +1092,7 @@ export default function DashboardEmail() {
     if (selectedIds.size === 0) return;
     try {
       await emailApi.bulkAction(accountId, {
-        message_ids: Array.from(selectedIds),
+        messageIds: Array.from(selectedIds),
         action,
         ...extra,
       });
@@ -1319,10 +1319,10 @@ export default function DashboardEmail() {
                     <button onClick={() => handleBulkAction('archive')} className="text-charcoal hover:text-sage font-medium">
                       Archive
                     </button>
-                    <button onClick={() => handleBulkAction('mark_read')} className="text-charcoal hover:text-sage font-medium">
+                    <button onClick={() => handleBulkAction('read')} className="text-charcoal hover:text-sage font-medium">
                       Mark Read
                     </button>
-                    <button onClick={() => handleBulkAction('mark_unread')} className="text-charcoal hover:text-sage font-medium">
+                    <button onClick={() => handleBulkAction('unread')} className="text-charcoal hover:text-sage font-medium">
                       Mark Unread
                     </button>
                     <div className="relative">
@@ -1337,7 +1337,7 @@ export default function DashboardEmail() {
                           {folders.filter(f => f.id !== selectedFolderId).map(f => (
                             <button
                               key={f.id}
-                              onClick={() => { handleBulkAction('move', { folder_id: f.id }); setMoveFolderDropdown(false); }}
+                              onClick={() => { handleBulkAction('move', { folderId: f.id }); setMoveFolderDropdown(false); }}
                               className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 text-charcoal"
                             >
                               {f.name}
