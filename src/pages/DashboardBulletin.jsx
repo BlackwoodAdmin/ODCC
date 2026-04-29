@@ -10,7 +10,12 @@ export default function DashboardBulletin() {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const thisSunday = getSundayOf(todayET());
+  // "This week's bulletin" = the upcoming Sunday service. If today is Sunday,
+  // that's today; otherwise it's next Sunday — bulletins for past Sundays are
+  // already done and belong under Past weeks.
+  const today = todayET();
+  const containingSunday = getSundayOf(today);
+  const thisSunday = today === containingSunday ? containingSunday : addWeeks(containingSunday, 1);
   const nextSunday = addWeeks(thisSunday, 1);
 
   useEffect(() => {
