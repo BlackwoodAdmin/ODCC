@@ -11,7 +11,7 @@ export default function DashboardComments() {
 
   const fetchComments = async () => {
     try {
-      const data = await api.get('/comments');
+      const data = await api.get('/comments/all');
       setComments(data.comments || data || []);
     } catch (err) { notify(err.message, 'error'); }
     finally { setLoading(false); }
