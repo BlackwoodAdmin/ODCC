@@ -29,6 +29,7 @@ import emailAdminLogRoutes from './routes/email-admin-logs.js';
 import { initEmailCrons } from './cron/email-cron.js';
 import donationRoutes from './routes/donations.js';
 import directoryRoutes from './routes/directory.js';
+import bulletinNoteRoutes from './routes/bulletin-notes.js';
 import { initDonationCrons } from './cron/donation-cleanup.js';
 import { requireOriginCheck } from './middleware/origin-check.js';
 
@@ -93,6 +94,7 @@ app.use('/api/auth', requireOriginCheck, authRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/comments', commentRoutes);
+app.use('/api/bulletin-notes', bulletinNoteRoutes);
 app.use('/api/contact', requireOriginCheck, contactRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);

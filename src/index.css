@@ -46,3 +46,51 @@ h1, h2, h3, h4 { font-family: 'Playfair Display', serif; }
     @apply outline-none ring-2 ring-sage ring-opacity-50;
   }
 }
+
+/* Bulletin print layout — when the editor page invokes window.print(),
+   hide site chrome and render only the bulletin content. */
+@media print {
+  @page { margin: 0.5in; }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  /* Hide site chrome — header, footer, nav, notification toasts. */
+  header, footer, nav,
+  [role="navigation"],
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* Strip the cream background and section padding so the bulletin content
+     starts at the page's top-left margin. */
+  .section-padding { padding: 0 !important; }
+  .bg-cream { background: #fff !important; }
+
+  .bulletin-print-content {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #000;
+  }
+  .bulletin-print-content h1,
+  .bulletin-print-content h2,
+  .bulletin-print-content h3,
+  .bulletin-print-content h4 {
+    font-family: 'Georgia', 'Times New Roman', serif;
+    color: #000;
+    margin-top: 0.5em;
+  }
+  .bulletin-print-content a {
+    color: #000;
+    text-decoration: underline;
+  }
+  .bulletin-print-content img {
+    max-width: 100%;
+    page-break-inside: avoid;
+  }
+}

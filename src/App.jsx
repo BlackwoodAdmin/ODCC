@@ -31,6 +31,8 @@ import DashboardDonations from './pages/DashboardDonations';
 import DashboardProfile from './pages/DashboardProfile';
 import DashboardDirectory from './pages/DashboardDirectory';
 import DashboardAdminDonations from './pages/DashboardAdminDonations';
+import DashboardBulletin from './pages/DashboardBulletin';
+import DashboardBulletinEditor from './pages/DashboardBulletinEditor';
 import Unsubscribe from './pages/Unsubscribe';
 
 function ScrollToTop() {
@@ -64,6 +66,8 @@ export default function App() {
               <Route path="/dashboard" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><Dashboard /></ProtectedRoute>} />
               <Route path="/dashboard/posts" element={<ProtectedRoute roles={['admin','contributor']}><DashboardPosts /></ProtectedRoute>} />
               <Route path="/dashboard/events" element={<ProtectedRoute roles={['admin','contributor']}><DashboardEvents /></ProtectedRoute>} />
+              <Route path="/dashboard/bulletin" element={<ProtectedRoute roles={['admin','contributor']}><DashboardBulletin /></ProtectedRoute>} />
+              <Route path="/dashboard/bulletin/:weekStart" element={<ProtectedRoute roles={['admin','contributor']}><DashboardBulletinEditor /></ProtectedRoute>} />
               <Route path="/dashboard/users" element={<ProtectedRoute roles={['admin']}><DashboardUsers /></ProtectedRoute>} />
               <Route path="/dashboard/comments" element={<ProtectedRoute roles={['admin']}><DashboardComments /></ProtectedRoute>} />
               <Route path="/dashboard/messages" element={<ProtectedRoute roles={['admin']}><DashboardMessages /></ProtectedRoute>} />

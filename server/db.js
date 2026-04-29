@@ -280,6 +280,15 @@ export async function initializeDatabase() {
       event_type VARCHAR(100) NOT NULL,
       processed_at BIGINT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS bulletin_notes (
+      id SERIAL PRIMARY KEY,
+      week_start DATE NOT NULL UNIQUE,
+      content TEXT NOT NULL DEFAULT '',
+      updated_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
   `);
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);

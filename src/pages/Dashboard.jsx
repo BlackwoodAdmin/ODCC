@@ -12,9 +12,12 @@ export default function Dashboard() {
   const donationCard = { to: '/dashboard/donations', label: 'My Donations', count: stats?.donations?.total || 0, icon: '💝', color: 'bg-rose-50 text-rose-600' };
   const donationAdminCard = { to: '/dashboard/admin/donations', label: 'Donation Reports', count: null, icon: '📊', color: 'bg-emerald-50 text-emerald-600' };
 
+  const bulletinCard = { to: '/dashboard/bulletin', label: 'Bulletin Notes', count: null, icon: '📋', color: 'bg-yellow-50 text-yellow-600' };
+
   const adminCards = [
     { to: '/dashboard/posts', label: 'Blog Posts', count: stats?.posts?.total || 0, icon: '📝', color: 'bg-blue-50 text-blue-600' },
     { to: '/dashboard/events', label: 'Events', count: stats?.events?.total || 0, icon: '📅', color: 'bg-green-50 text-green-600' },
+    bulletinCard,
     { to: '/dashboard/comments', label: 'Comments', count: stats?.comments?.total || 0, icon: '💬', color: 'bg-purple-50 text-purple-600' },
     { to: '/dashboard/messages', label: 'Messages', count: stats?.messages?.total || 0, unread: Number(stats?.messages?.unread) || 0, icon: '✉️', color: 'bg-orange-50 text-orange-600' },
     { to: '/dashboard/users', label: 'Users', count: stats?.users?.total || 0, icon: '👥', color: 'bg-pink-50 text-pink-600' },
@@ -28,7 +31,7 @@ export default function Dashboard() {
   ];
 
   const emailCard = { to: '/dashboard/email', label: 'Email', count: null, icon: '📧', color: 'bg-teal-50 text-teal-600' };
-  const contributorCards = [...adminCards.filter(c => ['/dashboard/posts', '/dashboard/events'].includes(c.to)), emailCard, donationCard, directoryCard, profileCard];
+  const contributorCards = [...adminCards.filter(c => ['/dashboard/posts', '/dashboard/events', '/dashboard/bulletin'].includes(c.to)), emailCard, donationCard, directoryCard, profileCard];
   const subscriberCards = [emailCard, donationCard, directoryCard, profileCard];
   const cards = user?.role === 'admin' ? adminCards : user?.role === 'contributor' ? contributorCards : subscriberCards;
 
