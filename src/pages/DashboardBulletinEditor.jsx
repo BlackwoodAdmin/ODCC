@@ -24,9 +24,17 @@ export default function DashboardBulletinEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
-  const ignoreNextChangeRef = useRef(false);
+  const loadedContentRef = useRef('');
 
   const validWeek = isSundayIsoDate(weekStart);
+
+  // TipTap normalizes empty content to '<p></p>'. Treat both as empty so a
+  // freshly-loaded blank week doesn't immediately read as dirty.
+  const isEmptyHtml = (h) => !h || h === '<p></p>';
+  const equalsLoaded = (html) => {
+    const loaded = loadedContentRef.current;
+    return html === loaded || (isEmptyHtml(html) && isEmptyHtml(loaded));
+  };
 
   useEffect(() => {
     if (!validWeek) return;
@@ -34,8 +42,9 @@ export default function DashboardBulletinEditor() {
     setDirty(false);
     api.get(`/bulletin-notes/${weekStart}`)
       .then(d => {
-        ignoreNextChangeRef.current = true;
-        setContent(d.note.content || '');
+        const loaded = d.note.content || '';
+        loadedContentRef.current = loaded;
+        setContent(loaded);
         setUpdatedAt(d.note.updated_at);
         setUpdatedByName(d.note.updated_by_name);
       })
@@ -51,12 +60,8 @@ export default function DashboardBulletinEditor() {
   }, [dirty]);
 
   const handleChange = useCallback((html) => {
-    if (ignoreNextChangeRef.current) {
-      ignoreNextChangeRef.current = false;
-      return;
-    }
     setContent(html);
-    setDirty(true);
+    setDirty(!equalsLoaded(html));
   }, []);
 
   const doSave = async (overwrite = false) => {
@@ -65,6 +70,8 @@ export default function DashboardBulletinEditor() {
       const body = { content };
       if (!overwrite && updatedAt !== null) body.expected_updated_at = updatedAt;
       const data = await api.put(`/bulletin-notes/${weekStart}`, body);
+      loadedContentRef.current = data.note.content ?? content;
+      setContent(data.note.content ?? content);
       setUpdatedAt(data.note.updated_at);
       setUpdatedByName(data.note.updated_by_name);
       setDirty(false);
@@ -80,8 +87,9 @@ export default function DashboardBulletinEditor() {
           `OK = discard your changes and load theirs.\n` +
           `Cancel = overwrite their version with yours.`;
         if (window.confirm(message)) {
-          ignoreNextChangeRef.current = true;
-          setContent(latest.content || '');
+          const loaded = latest.content || '';
+          loadedContentRef.current = loaded;
+          setContent(loaded);
           setUpdatedAt(latest.updated_at);
           setUpdatedByName(latest.updated_by_name);
           setDirty(false);
