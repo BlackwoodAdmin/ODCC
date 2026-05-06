@@ -47,6 +47,7 @@ export default function BlogPost() {
         <meta property="og:image" content={post.featured_image || 'https://opendoorchristian.church/uploads/church-header.jpg'} />
         <meta property="og:type" content="article" />
         <meta property="og:url" content={`https://opendoorchristian.church/blog/${slug}`} />
+        <meta property="fb:app_id" content="949925117923722" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={post.title} />
         <meta name="twitter:description" content={post.excerpt || post.title} />

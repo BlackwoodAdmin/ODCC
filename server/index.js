@@ -182,6 +182,7 @@ app.get('/blog/:slug', async (req, res) => {
   <meta property="og:image:type" content="${ogImageType}" />
   <meta property="og:type" content="article" />
   <meta property="og:url" content="${postUrl}" />
+  <meta property="fb:app_id" content="949925117923722" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
@@ -189,7 +190,7 @@ app.get('/blog/:slug', async (req, res) => {
 
     // Strip existing title, OG, and Twitter meta tags, then inject post-specific ones
     let html = indexHtml.replace(/<title>[^<]*<\/title>/, '');
-    html = html.replace(/<meta\s+(?:property="og:[^"]*"|name="twitter:[^"]*"|name="description")[^>]*\/?\s*>\s*/g, '');
+    html = html.replace(/<meta\s+(?:property="(?:og|fb):[^"]*"|name="twitter:[^"]*"|name="description")[^>]*\/?\s*>\s*/g, '');
     html = html.replace('</head>', ogTags + '\n</head>');
 
     res.type('html').send(html);
