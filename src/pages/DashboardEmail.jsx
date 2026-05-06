@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import useAuth from '../hooks/useAuth';
 import useNotification from '../hooks/useNotification';
 import { formatDateTime } from '../utils/formatters';
+import api from '../services/api';
 import {
   useUserEmailAccounts,
   useFolders,
@@ -166,6 +167,14 @@ function IconDownload({ className = 'w-4 h-4' }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+    </svg>
+  );
+}
+
+function IconPrint({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
     </svg>
   );
 }
@@ -594,9 +603,61 @@ function ThreadViewer({ accountId, threadId, threadMessages, threadLoading, onCl
 
 // ---------------------------------------------------------------------------
 
+function escapeForHtml(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function buildEnvelopeHtml(message) {
+  if (!message) return '';
+  const from = message.from_name
+    ? `${message.from_name} <${message.from_address || ''}>`
+    : (message.from_address || '');
+  const to = fmtAddrs(message.to_addresses);
+  const cc = parseAddrs(message.cc_addresses).length ? fmtAddrs(message.cc_addresses) : '';
+  const date = formatDateTime(message.sent_at || message.received_at || message.created_at);
+  const lines = [
+    `<div><strong>From:</strong> ${escapeForHtml(from)}</div>`,
+    `<div><strong>To:</strong> ${escapeForHtml(to)}</div>`,
+    cc ? `<div><strong>CC:</strong> ${escapeForHtml(cc)}</div>` : '',
+    `<div><strong>Date:</strong> ${escapeForHtml(date)}</div>`,
+    `<div><strong>Subject:</strong> ${escapeForHtml(message.subject || '')}</div>`,
+  ].filter(Boolean).join('');
+  return lines;
+}
+
+function buildIframeSrcDoc(message) {
+  // Envelope is hidden on screen, shown only when printing — keeps the
+  // existing on-screen rendering identical while adding print headers.
+  const envelope = buildEnvelopeHtml(message);
+  const style = `
+    .__odcc-envelope { display: none; }
+    @media print {
+      body { color: #000; background: #fff; }
+      .__odcc-envelope {
+        display: block;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 0.75rem;
+        margin-bottom: 1rem;
+        font-family: sans-serif;
+        font-size: 0.875rem;
+        color: #000;
+      }
+      .__odcc-envelope div { margin-bottom: 0.25rem; }
+      .__odcc-envelope strong { display: inline-block; width: 4.5rem; }
+    }
+  `;
+  return `<base target="_blank"><style>${style}</style><div class="__odcc-envelope">${envelope}</div>${message.body_html || ''}`;
+}
+
 function MessageViewer({ accountId, messageId, onClose, onCompose, onRefresh }) {
   const { notify } = useNotification();
   const { message, loading } = useMessage(accountId, messageId);
+  const iframeRef = useRef(null);
 
   const handleStar = async () => {
     if (!message) return;
@@ -655,6 +716,58 @@ function MessageViewer({ accountId, messageId, onClose, onCompose, onRefresh }) 
     });
   };
 
+  const handlePrint = () => {
+    if (!message) return;
+    if (message.body_html && iframeRef.current?.contentWindow) {
+      try {
+        iframeRef.current.contentWindow.focus();
+        iframeRef.current.contentWindow.print();
+        return;
+      } catch {
+        // Fall through to popup path.
+      }
+    }
+    const win = window.open('', '_blank');
+    if (!win) {
+      notify('Popup blocked — allow popups to print', 'error');
+      return;
+    }
+    const envelope = buildEnvelopeHtml(message);
+    const body = message.body_html
+      ? message.body_html
+      : `<pre style="white-space:pre-wrap;font-family:sans-serif;">${escapeForHtml(message.body_text || '')}</pre>`;
+    const css = `
+      body { font-family: sans-serif; color: #000; background: #fff; padding: 1rem; }
+      .env { border-bottom: 1px solid #ccc; padding-bottom: 0.75rem; margin-bottom: 1rem; font-size: 0.875rem; }
+      .env div { margin-bottom: 0.25rem; }
+      .env strong { display: inline-block; width: 4.5rem; }
+    `;
+    win.document.open();
+    win.document.write(`<!doctype html><html><head><title>${escapeForHtml(message.subject || 'Message')}</title><style>${css}</style></head><body><div class="env">${envelope}</div>${body}</body></html>`);
+    win.document.close();
+    const triggerPrint = () => { try { win.focus(); win.print(); } catch {} };
+    if (win.document.readyState === 'complete') triggerPrint();
+    else win.addEventListener('load', triggerPrint);
+  };
+
+  const handleDownloadAttachment = async (att) => {
+    let objectUrl = null;
+    try {
+      const blob = await api.downloadBlob(`/email/attachments/${att.id}`);
+      objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = att.filename || 'attachment';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      notify(err.message || 'Failed to download attachment', 'error');
+    } finally {
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    }
+  };
+
   const handleForward = () => {
     if (!message) return;
     onCompose({
@@ -701,9 +814,17 @@ function MessageViewer({ accountId, messageId, onClose, onCompose, onRefresh }) 
       {/* Message body */}
       <div className="flex-1 overflow-auto p-6">
         {message.body_html ? (
+          /*
+           * SECURITY INVARIANT: the sandbox below MUST NOT include `allow-scripts`.
+           * Combined with `allow-same-origin`, scripts inside the iframe would gain
+           * access to the parent's origin (and localStorage, where the JWT lives).
+           * `allow-same-origin` + `allow-modals` are required so contentWindow.print()
+           * works for the Print button. Do not add allow-scripts.
+           */
           <iframe
-            sandbox="allow-popups allow-popups-to-escape-sandbox"
-            srcDoc={`<base target="_blank">${message.body_html}`}
+            ref={iframeRef}
+            sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin allow-modals"
+            srcDoc={buildIframeSrcDoc(message)}
             title="Email content"
             className="w-full border-0 min-h-[300px]"
             style={{ height: '100%' }}
@@ -719,16 +840,16 @@ function MessageViewer({ accountId, messageId, onClose, onCompose, onRefresh }) 
           <p className="text-xs font-medium text-gray-500 mb-2">Attachments ({message.attachments.length})</p>
           <div className="flex flex-wrap gap-2">
             {message.attachments.map((att, idx) => (
-              <a
-                key={idx}
-                href={att.url || '#'}
-                download={att.filename}
+              <button
+                key={att.id ?? idx}
+                type="button"
+                onClick={() => handleDownloadAttachment(att)}
                 className="inline-flex items-center gap-2 bg-gray-50 hover:bg-gray-100 rounded-lg px-3 py-2 text-xs text-charcoal"
               >
                 <IconDownload className="w-3.5 h-3.5 text-sage" />
                 <span>{att.filename}</span>
-                {att.size && <span className="text-gray-400">({Math.round(att.size / 1024)}KB)</span>}
-              </a>
+                {att.size_bytes != null && <span className="text-gray-400">({Math.round(att.size_bytes / 1024)}KB)</span>}
+              </button>
             ))}
           </div>
         </div>
@@ -744,6 +865,9 @@ function MessageViewer({ accountId, messageId, onClose, onCompose, onRefresh }) 
         </button>
         <button onClick={handleForward} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-charcoal hover:bg-gray-50">
           <IconForward className="w-4 h-4" /> Forward
+        </button>
+        <button onClick={handlePrint} className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm text-charcoal hover:bg-gray-50">
+          <IconPrint className="w-4 h-4" /> Print
         </button>
       </div>
     </div>

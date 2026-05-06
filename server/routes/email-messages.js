@@ -1,9 +1,84 @@
 import { Router } from 'express';
 import crypto from 'crypto';
+import path from 'path';
+import fs from 'fs/promises';
 import sgMail from '@sendgrid/mail';
 import { query } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { emailLog } from '../utils/email-log.js';
+
+const DATA_BASE = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+
+// Strict allowlist for inlining images as data URIs. SVG is intentionally
+// excluded — it can carry scripts and would become an XSS vector if the
+// dashboard iframe ever ran with allow-scripts.
+const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
+
+const PER_IMAGE_RAW_CAP = Math.floor(1.5 * 1024 * 1024); // ~2 MB encoded
+const AGGREGATE_RAW_CAP = 6 * 1024 * 1024;               // ~8 MB encoded
+
+function regexEscape(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+async function buildInlineImageMaps(attachments) {
+  const candidates = attachments.filter(
+    (a) => a.content_id && INLINE_IMAGE_TYPES.has(a.content_type)
+  );
+  const cidMap = new Map();
+  const pathMap = new Map();
+  if (!candidates.length) return { cidMap, pathMap };
+
+  const reads = await Promise.all(
+    candidates.map(async (att) => {
+      try {
+        if (!att.storage_path) return null;
+        const resolved = path.isAbsolute(att.storage_path)
+          ? path.resolve(att.storage_path)
+          : path.resolve(DATA_BASE, att.storage_path);
+        if (!resolved.startsWith(path.resolve(DATA_BASE) + path.sep)) return null;
+        const stat = await fs.stat(resolved);
+        if (stat.size > PER_IMAGE_RAW_CAP) return null;
+        const buf = await fs.readFile(resolved);
+        return { att, buf };
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  let totalRaw = 0;
+  for (const r of reads) {
+    if (!r) continue;
+    if (totalRaw + r.buf.length > AGGREGATE_RAW_CAP) continue;
+    totalRaw += r.buf.length;
+    const dataUri = `data:${r.att.content_type};base64,${r.buf.toString('base64')}`;
+    cidMap.set(String(r.att.content_id).toLowerCase(), dataUri);
+    // storage_path is "attachments/<uuid>/<basename>"; the legacy in-HTML
+    // form written by older inbound versions is "/data/attachments/<uuid>/<basename>".
+    const inHtmlPath = '/data/' + String(r.att.storage_path).replace(/^\/+/, '');
+    pathMap.set(inHtmlPath, dataUri);
+  }
+  return { cidMap, pathMap };
+}
+
+function rewriteInlineImages(html, cidMap, pathMap) {
+  if (!html) return html;
+  let out = html;
+  // Function form of replace is required: base64 payloads contain `$`, which
+  // the string form interprets as backreferences ($&, $1, $$) and corrupts.
+  if (cidMap.size) {
+    const alts = [...cidMap.keys()].map(regexEscape).join('|');
+    const cidRe = new RegExp(`cid:(${alts})`, 'gi');
+    out = out.replace(cidRe, (match, id) => cidMap.get(id.toLowerCase()) ?? match);
+  }
+  if (pathMap.size) {
+    const alts = [...pathMap.keys()].map(regexEscape).join('|');
+    const pathRe = new RegExp(alts, 'g');
+    out = out.replace(pathRe, (match) => pathMap.get(match) ?? match);
+  }
+  return out;
+}
 
 const router = Router();
 
@@ -506,13 +581,33 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
       message.updated_at = now;
     }
 
-    // Fetch attachments
-    const attachments = await query(
-      'SELECT id, filename, content_type, size_bytes, content_id, is_blocked, created_at FROM email_attachments WHERE message_id = $1',
+    // Fetch attachments (storage_path needed for legacy-path rewrite + inline image resolution)
+    const attachmentsResult = await query(
+      'SELECT id, filename, content_type, size_bytes, content_id, is_blocked, storage_path, created_at FROM email_attachments WHERE message_id = $1',
       [msgId]
     );
+    const allAttachments = attachmentsResult.rows;
 
-    res.json({ message, attachments: attachments.rows });
+    // Resolve inline images (cid: + legacy /data/attachments/...) to data URIs.
+    if (message.body_html) {
+      const { cidMap, pathMap } = await buildInlineImageMaps(allAttachments);
+      message.body_html = rewriteInlineImages(message.body_html, cidMap, pathMap);
+    }
+
+    // Hide inline images from the user-visible attachment list. Non-image
+    // inline attachments (rare) stay visible. Strip storage_path from response.
+    const visibleAttachments = allAttachments
+      .filter((a) => !(a.content_id && INLINE_IMAGE_TYPES.has(a.content_type)))
+      .map(({ storage_path, ...rest }) => ({
+        ...rest,
+        size: rest.size_bytes,
+        url: `/api/email/attachments/${rest.id}`,
+      }));
+
+    // GET marks the message as read and contents change on move/delete/reply,
+    // so the response must not be cached.
+    res.set('Cache-Control', 'no-store');
+    res.json({ message, attachments: visibleAttachments });
   } catch (err) {
     console.error('[EmailMessages] Get error:', err.message);
     res.status(500).json({ error: 'Failed to get message' });

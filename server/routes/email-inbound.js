@@ -320,15 +320,9 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
         }
       }
 
-      // Rewrite inline CID image references in HTML
-      for (const att of attachmentRecords) {
-        if (att.content_id && bodyHtml) {
-          bodyHtml = bodyHtml.replace(
-            new RegExp(`cid:${escapeRegExp(att.content_id)}`, 'gi'),
-            `/data/attachments/${attachmentUuid}/${path.basename(att.final_path)}`
-          );
-        }
-      }
+      // Inline cid: references are left in body_html as-is. The message-fetch
+      // endpoint resolves them to data URIs at read time using the attachment
+      // rows' storage_path + content_id.
 
       // ------------------------------------------------------------------
       // 10. Calculate size_bytes
@@ -663,13 +657,6 @@ function parseAddressList(raw) {
     const name = parseEmailName(part);
     return { address, name };
   }).filter((p) => p.address);
-}
-
-/**
- * Escape a string for use in a RegExp.
- */
-function escapeRegExp(str) {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /**

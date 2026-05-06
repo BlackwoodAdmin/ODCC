@@ -88,7 +88,7 @@ export function useMessage(accountId, messageId) {
     setLoading(true);
     try {
       const res = await api.get(`/email/accounts/${accountId}/messages/${messageId}`);
-      setMessage(res.message || null);
+      setMessage(res.message ? { ...res.message, attachments: res.attachments || [] } : null);
     } catch { setMessage(null); }
     finally { setLoading(false); }
   }, [accountId, messageId]);
