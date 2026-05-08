@@ -12,9 +12,13 @@ import { emailLog } from '../utils/email-log.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-const TMP_DIR = IS_PRODUCTION ? '/home/appuser/app/data/tmp' : path.join(__dirname, '..', '..', 'data', 'tmp');
-const ATTACHMENTS_BASE = IS_PRODUCTION ? '/home/appuser/app/data/attachments' : path.join(__dirname, '..', '..', 'data', 'attachments');
+// Resolve from DATA_DIR (env) → fall back to <repo>/data so dev and prod
+// share one path convention. The previous hardcoded `/home/appuser/app/...`
+// did not match the actual prod path (/home/appuser/projects/church/app/),
+// so MIME-attachment writeFile crashed with ENOENT and dropped the email.
+const DATA_BASE = process.env.DATA_DIR || path.join(__dirname, '..', '..', 'data');
+const TMP_DIR = path.join(DATA_BASE, 'tmp');
+const ATTACHMENTS_BASE = path.join(DATA_BASE, 'attachments');
 
 const BLOCKED_EXTENSIONS = new Set(['.exe', '.bat', '.cmd', '.scr', '.ps1', '.vbs', '.msi', '.dll', '.com', '.pif']);
 const MAX_HTML_BYTES = 1024 * 1024; // 1 MB
@@ -299,6 +303,7 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
           if (att.content) {
             const attFilename = `${Date.now()}-${crypto.randomUUID()}-${att.filename || 'attachment'}`;
             const tmpPath = path.join(TMP_DIR, attFilename);
+            await fs.mkdir(TMP_DIR, { recursive: true });
             await fs.writeFile(tmpPath, att.content);
             tempFiles.push(tmpPath);
 
