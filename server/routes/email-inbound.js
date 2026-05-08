@@ -366,6 +366,11 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
             table: ['border', 'cellpadding', 'cellspacing', 'style', 'width', 'height', 'align', 'bgcolor'],
           },
           allowedSchemes: ['http', 'https', 'mailto'],
+          // Preserve `cid:` only on <img>. The read-time resolver in
+          // email-messages.js rewrites these to data URIs (strict png/jpeg/
+          // gif/webp allowlist). Without this, sanitize-html strips the src
+          // and inline images break.
+          allowedSchemesByTag: { img: ['http', 'https', 'cid'] },
         });
       }
 
