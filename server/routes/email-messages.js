@@ -2,12 +2,15 @@ import { Router } from 'express';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
+import multer from 'multer';
 import sgMail from '@sendgrid/mail';
 import { query } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { emailLog } from '../utils/email-log.js';
 
 const DATA_BASE = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const TMP_DIR = path.join(DATA_BASE, 'tmp');
+const ATTACHMENTS_BASE = path.join(DATA_BASE, 'attachments');
 
 // Strict allowlist for inlining images as data URIs. SVG is intentionally
 // excluded — it can carry scripts and would become an XSS vector if the
@@ -19,6 +22,130 @@ const AGGREGATE_RAW_CAP = 6 * 1024 * 1024;               // ~8 MB encoded
 
 function regexEscape(str) {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ── Outbound attachment upload (multer) ─────────────────────────────────────
+// 25 MB per file matches MAX_MESSAGE_BYTES below. Multipart requests get
+// their fields in req.body as strings; JSON requests bypass multer entirely.
+const composeStorage = multer.diskStorage({
+  destination: async (_req, _file, cb) => {
+    try {
+      await fs.mkdir(TMP_DIR, { recursive: true });
+      cb(null, TMP_DIR);
+    } catch (err) { cb(err); }
+  },
+  filename: (_req, file, cb) => {
+    cb(null, `${Date.now()}-${crypto.randomUUID()}-${file.originalname || 'file'}`);
+  },
+});
+const composeUpload = multer({
+  storage: composeStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+});
+
+/**
+ * Parse compose fields from either a JSON body or a multipart form body.
+ * For multipart, array fields (to/cc/bcc) arrive as JSON-encoded strings.
+ */
+function parseComposeFields(req) {
+  const isMultipart = !!(req.files && req.files.length) ||
+    (req.is && req.is('multipart/form-data'));
+  const parseList = (v) => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (Array.isArray(v)) return v;
+    if (typeof v === 'string') {
+      try { return JSON.parse(v); } catch { return undefined; }
+    }
+    return v;
+  };
+  if (isMultipart) {
+    return {
+      to: parseList(req.body.to),
+      cc: parseList(req.body.cc),
+      bcc: parseList(req.body.bcc),
+      subject: req.body.subject ?? null,
+      body_html: req.body.body_html ?? null,
+      body_text: req.body.body_text ?? null,
+      draft: req.body.draft === 'true' || req.body.draft === true,
+      forwardTo: parseList(req.body.forwardTo),
+      forwardCc: parseList(req.body.forwardCc),
+      forwardBcc: parseList(req.body.forwardBcc),
+    };
+  }
+  return {
+    to: req.body.to,
+    cc: req.body.cc,
+    bcc: req.body.bcc,
+    subject: req.body.subject ?? null,
+    body_html: req.body.body_html ?? null,
+    body_text: req.body.body_text ?? null,
+    draft: !!req.body.draft,
+    forwardTo: req.body.forwardTo,
+    forwardCc: req.body.forwardCc,
+    forwardBcc: req.body.forwardBcc,
+  };
+}
+
+/**
+ * Persist multer-uploaded files for an outbound message.
+ * Moves each file from TMP_DIR to data/attachments/<uuid>/, inserts an
+ * email_attachments row, and on failure cleans up temp files.
+ * Returns the total attachment size in bytes.
+ */
+async function saveOutboundAttachments(messageDbId, files) {
+  if (!files || !files.length) return 0;
+  const dirUuid = crypto.randomUUID();
+  const finalDir = path.join(ATTACHMENTS_BASE, dirUuid);
+  await fs.mkdir(finalDir, { recursive: true });
+
+  let total = 0;
+  const moved = [];
+  try {
+    for (const f of files) {
+      const finalName = path.basename(f.path);
+      const finalPath = path.join(finalDir, finalName);
+      try {
+        await fs.rename(f.path, finalPath);
+      } catch {
+        await fs.copyFile(f.path, finalPath);
+        await fs.unlink(f.path).catch(() => {});
+      }
+      moved.push(finalPath);
+      const storagePath = `attachments/${dirUuid}/${finalName}`;
+      await query(
+        `INSERT INTO email_attachments
+           (message_id, filename, content_type, size_bytes, storage_path,
+            content_id, is_blocked, created_at)
+         VALUES ($1, $2, $3, $4, $5, NULL, FALSE, $6)`,
+        [
+          messageDbId,
+          f.originalname || finalName,
+          f.mimetype || 'application/octet-stream',
+          f.size,
+          storagePath,
+          Date.now(),
+        ]
+      );
+      total += f.size;
+    }
+  } catch (err) {
+    // Best-effort rollback of files written this call. The DB rows that did
+    // succeed will be visible only via the message; the message itself was
+    // already inserted by the caller. Caller logs the failure.
+    for (const p of moved) await fs.unlink(p).catch(() => {});
+    throw err;
+  }
+  return total;
+}
+
+/**
+ * Best-effort cleanup of leftover multer temp files.
+ */
+async function cleanupTempFiles(files) {
+  if (!files || !files.length) return;
+  for (const f of files) {
+    try { await fs.unlink(f.path); } catch {}
+  }
 }
 
 async function buildInlineImageMaps(attachments) {
@@ -316,6 +443,42 @@ async function executeSend(messageId, accountId, userId, ip) {
   if (msg.message_id) sgMsg.headers['Message-ID'] = msg.message_id;
   if (msg.in_reply_to) sgMsg.headers['In-Reply-To'] = msg.in_reply_to;
   if (msg.references_header) sgMsg.headers['References'] = msg.references_header;
+
+  // Attach files persisted on disk for this message.
+  try {
+    const attRes = await query(
+      'SELECT filename, content_type, storage_path, content_id FROM email_attachments WHERE message_id = $1',
+      [messageId]
+    );
+    if (attRes.rows.length) {
+      const sgAtts = [];
+      for (const a of attRes.rows) {
+        const resolved = path.isAbsolute(a.storage_path)
+          ? path.resolve(a.storage_path)
+          : path.resolve(DATA_BASE, a.storage_path);
+        if (!resolved.startsWith(path.resolve(DATA_BASE) + path.sep)) continue;
+        try {
+          const buf = await fs.readFile(resolved);
+          sgAtts.push({
+            content: buf.toString('base64'),
+            filename: a.filename,
+            type: a.content_type || 'application/octet-stream',
+            disposition: a.content_id ? 'inline' : 'attachment',
+            ...(a.content_id ? { content_id: a.content_id } : {}),
+          });
+        } catch (readErr) {
+          await emailLog('warn', 'outbound', 'Skipping unreadable attachment on send', {
+            messageId, filename: a.filename, error: readErr.message,
+          });
+        }
+      }
+      if (sgAtts.length) sgMsg.attachments = sgAtts;
+    }
+  } catch (err) {
+    await emailLog('error', 'outbound', 'Attachment lookup failed on send', {
+      messageId, error: err.message,
+    });
+  }
 
   // Attempt send with one retry for transient failures
   let sent = false;
@@ -615,25 +778,32 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
 });
 
 // ── POST /accounts/:id/messages ──────────────────────────────────────────────
-// Compose & send (or save draft). Body: { to, cc, bcc, subject, body_html, body_text, draft }
-router.post('/accounts/:id/messages', async (req, res) => {
+// Compose & send (or save draft). Accepts JSON or multipart/form-data.
+// Multipart uses field name "attachments" for files; to/cc/bcc are JSON-encoded.
+router.post('/accounts/:id/messages', composeUpload.any(), async (req, res) => {
   try {
-    if (!(await verifyAccountAccess(req, res))) return;
+    if (!(await verifyAccountAccess(req, res))) {
+      await cleanupTempFiles(req.files);
+      return;
+    }
     const accountId = parseInt(req.params.id, 10);
     const account = req.emailAccount;
-    const { to, cc, bcc, subject, body_html, body_text, draft } = req.body;
+    const { to, cc, bcc, subject, body_html, body_text, draft } = parseComposeFields(req);
     const now = Date.now();
 
     // Validate recipients for non-draft
     if (!draft) {
       if (!to || !Array.isArray(to) || to.length === 0) {
+        await cleanupTempFiles(req.files);
         return res.status(400).json({ error: 'At least one recipient (to) is required' });
       }
     }
 
-    // Size limit check
-    const sizeBytes = estimateMessageSize(body_html, body_text, subject);
+    // Size limit check (body + attachments)
+    const attachmentBytes = (req.files || []).reduce((s, f) => s + (f.size || 0), 0);
+    const sizeBytes = estimateMessageSize(body_html, body_text, subject) + attachmentBytes;
     if (sizeBytes > MAX_MESSAGE_BYTES) {
+      await cleanupTempFiles(req.files);
       return res.status(413).json({ error: 'Message exceeds 25 MB size limit' });
     }
 
@@ -645,6 +815,7 @@ router.post('/accounts/:id/messages', async (req, res) => {
           count: account.daily_send_count,
           limit: account.daily_send_limit,
         });
+        await cleanupTempFiles(req.files);
         return res.status(429).json({ error: 'Daily send limit reached. Try again tomorrow.' });
       }
 
@@ -697,6 +868,17 @@ router.post('/accounts/:id/messages', async (req, res) => {
 
     const message = result.rows[0];
 
+    // Persist uploaded attachments (after message insert so message_id is known).
+    try {
+      await saveOutboundAttachments(message.id, req.files);
+    } catch (err) {
+      await emailLog('error', 'outbound', 'Failed to save outbound attachments', {
+        messageId: message.id, error: err.message,
+      });
+      await cleanupTempFiles(req.files);
+      return res.status(500).json({ error: 'Failed to save attachments' });
+    }
+
     if (draft) {
       await auditLog(accountId, req.user.id, 'draft_saved', message.id, null, req.ip);
       return res.status(201).json({ message });
@@ -713,6 +895,7 @@ router.post('/accounts/:id/messages', async (req, res) => {
     });
   } catch (err) {
     console.error('[EmailMessages] Compose error:', err.message);
+    await cleanupTempFiles(req.files);
     res.status(500).json({ error: 'Failed to compose message' });
   }
 });
@@ -996,34 +1179,46 @@ router.post('/accounts/:id/messages/bulk', async (req, res) => {
 });
 
 // ── POST /accounts/:id/messages/:msgId/reply ─────────────────────────────────
-router.post('/accounts/:id/messages/:msgId/reply', async (req, res) => {
+router.post('/accounts/:id/messages/:msgId/reply', composeUpload.any(), async (req, res) => {
   try {
-    if (!(await verifyAccountAccess(req, res))) return;
+    if (!(await verifyAccountAccess(req, res))) {
+      await cleanupTempFiles(req.files);
+      return;
+    }
     await handleReply(req, res, 'reply');
   } catch (err) {
     console.error('[EmailMessages] Reply error:', err.message);
+    await cleanupTempFiles(req.files);
     res.status(500).json({ error: 'Failed to send reply' });
   }
 });
 
 // ── POST /accounts/:id/messages/:msgId/reply-all ─────────────────────────────
-router.post('/accounts/:id/messages/:msgId/reply-all', async (req, res) => {
+router.post('/accounts/:id/messages/:msgId/reply-all', composeUpload.any(), async (req, res) => {
   try {
-    if (!(await verifyAccountAccess(req, res))) return;
+    if (!(await verifyAccountAccess(req, res))) {
+      await cleanupTempFiles(req.files);
+      return;
+    }
     await handleReply(req, res, 'reply-all');
   } catch (err) {
     console.error('[EmailMessages] Reply-all error:', err.message);
+    await cleanupTempFiles(req.files);
     res.status(500).json({ error: 'Failed to send reply-all' });
   }
 });
 
 // ── POST /accounts/:id/messages/:msgId/forward ──────────────────────────────
-router.post('/accounts/:id/messages/:msgId/forward', async (req, res) => {
+router.post('/accounts/:id/messages/:msgId/forward', composeUpload.any(), async (req, res) => {
   try {
-    if (!(await verifyAccountAccess(req, res))) return;
+    if (!(await verifyAccountAccess(req, res))) {
+      await cleanupTempFiles(req.files);
+      return;
+    }
     await handleReply(req, res, 'forward');
   } catch (err) {
     console.error('[EmailMessages] Forward error:', err.message);
+    await cleanupTempFiles(req.files);
     res.status(500).json({ error: 'Failed to forward message' });
   }
 });
@@ -1034,7 +1229,10 @@ router.post('/accounts/:id/messages/:msgId/forward', async (req, res) => {
 async function handleReply(req, res, mode) {
   const accountId = parseInt(req.params.id, 10);
   const msgId = parseInt(req.params.msgId, 10);
-  if (isNaN(msgId)) return res.status(400).json({ error: 'Invalid message ID' });
+  if (isNaN(msgId)) {
+    await cleanupTempFiles(req.files);
+    return res.status(400).json({ error: 'Invalid message ID' });
+  }
 
   const account = req.emailAccount;
 
@@ -1043,10 +1241,19 @@ async function handleReply(req, res, mode) {
     'SELECT * FROM email_messages WHERE id = $1 AND account_id = $2',
     [msgId, accountId]
   );
-  if (!origResult.rows.length) return res.status(404).json({ error: 'Original message not found' });
+  if (!origResult.rows.length) {
+    await cleanupTempFiles(req.files);
+    return res.status(404).json({ error: 'Original message not found' });
+  }
   const orig = origResult.rows[0];
 
-  const { subject, body_html, body_text, to: forwardTo, cc: forwardCc, bcc: forwardBcc } = req.body;
+  const fields = parseComposeFields(req);
+  const { subject, body_html, body_text } = fields;
+  // Forward routes accept new recipients via top-level to/cc/bcc OR via the
+  // explicit forwardTo/forwardCc/forwardBcc names used by the client helper.
+  const forwardTo = fields.forwardTo ?? fields.to;
+  const forwardCc = fields.forwardCc ?? fields.cc;
+  const forwardBcc = fields.forwardBcc ?? fields.bcc;
 
   // Build recipients based on mode
   let toAddrs, ccAddrs, bccAddrs;
@@ -1087,6 +1294,7 @@ async function handleReply(req, res, mode) {
   } else {
     // Forward — user specifies new recipients
     if (!forwardTo || !Array.isArray(forwardTo) || forwardTo.length === 0) {
+      await cleanupTempFiles(req.files);
       return res.status(400).json({ error: 'At least one recipient (to) is required for forwarding' });
     }
     toAddrs = forwardTo;
@@ -1101,6 +1309,7 @@ async function handleReply(req, res, mode) {
       count: account.daily_send_count,
       limit: account.daily_send_limit,
     });
+    await cleanupTempFiles(req.files);
     return res.status(429).json({ error: 'Daily send limit reached. Try again tomorrow.' });
   }
 
@@ -1112,9 +1321,11 @@ async function handleReply(req, res, mode) {
     });
   }
 
-  // Size limit check
-  const sizeBytes = estimateMessageSize(body_html, body_text, subject);
+  // Size limit check (body + attachments)
+  const attachmentBytes = (req.files || []).reduce((s, f) => s + (f.size || 0), 0);
+  const sizeBytes = estimateMessageSize(body_html, body_text, subject) + attachmentBytes;
   if (sizeBytes > MAX_MESSAGE_BYTES) {
+    await cleanupTempFiles(req.files);
     return res.status(413).json({ error: 'Message exceeds 25 MB size limit' });
   }
 
@@ -1178,6 +1389,17 @@ async function handleReply(req, res, mode) {
   );
 
   const message = result.rows[0];
+
+  // Persist uploaded attachments before scheduling send.
+  try {
+    await saveOutboundAttachments(message.id, req.files);
+  } catch (err) {
+    await emailLog('error', 'outbound', 'Failed to save reply/forward attachments', {
+      messageId: message.id, error: err.message,
+    });
+    await cleanupTempFiles(req.files);
+    return res.status(500).json({ error: 'Failed to save attachments' });
+  }
 
   // Schedule undo-send
   scheduleSend(message.id, accountId, req.user.id, req.ip);

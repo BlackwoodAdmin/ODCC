@@ -266,6 +266,30 @@ function ComposeOverlay({ accountId, accounts, onClose, onSent, prefill }) {
       .replace(/\n/g, '<br>');
   };
 
+  // Build the request body. With files we use multipart so the server can
+  // persist them; otherwise plain JSON keeps the existing path simple.
+  const buildPayload = (extra = {}) => {
+    const base = {
+      to: extra.to !== undefined ? extra.to : parseRecipients(to),
+      cc: extra.cc !== undefined ? extra.cc : (cc ? parseRecipients(cc) : []),
+      bcc: extra.bcc !== undefined ? extra.bcc : (bcc ? parseRecipients(bcc) : []),
+      subject,
+      body_html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5;color:#1f2937;">${textToHtml(body)}</div>`,
+      body_text: body,
+      ...(extra.draft ? { draft: true } : {}),
+      ...(extra.forwardTo !== undefined ? { forwardTo: extra.forwardTo } : {}),
+      ...(extra.forwardCc !== undefined ? { forwardCc: extra.forwardCc } : {}),
+    };
+    if (!attachments.length) return base;
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(base)) {
+      if (v === undefined || v === null) continue;
+      fd.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+    }
+    for (const file of attachments) fd.append('attachments', file, file.name);
+    return fd;
+  };
+
   const handleSend = async () => {
     if (!to.trim()) {
       notify('Please enter a recipient', 'error');
@@ -273,24 +297,19 @@ function ComposeOverlay({ accountId, accounts, onClose, onSent, prefill }) {
     }
     setSending(true);
     try {
-      const payload = {
-        to: parseRecipients(to),
-        cc: cc ? parseRecipients(cc) : [],
-        bcc: bcc ? parseRecipients(bcc) : [],
-        subject,
-        body_html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5;color:#1f2937;">${textToHtml(body)}</div>`,
-        body_text: body,
-      };
-
       let result;
       if (prefill?.replyToId && prefill?.mode === 'reply') {
-        result = await emailApi.reply(accountId, prefill.replyToId, payload);
+        result = await emailApi.reply(accountId, prefill.replyToId, buildPayload());
       } else if (prefill?.replyToId && prefill?.mode === 'reply-all') {
-        result = await emailApi.replyAll(accountId, prefill.replyToId, payload);
+        result = await emailApi.replyAll(accountId, prefill.replyToId, buildPayload());
       } else if (prefill?.replyToId && prefill?.mode === 'forward') {
-        result = await emailApi.forward(accountId, prefill.replyToId, { ...payload, forwardTo: payload.to, forwardCc: payload.cc });
+        const fwdTo = parseRecipients(to);
+        const fwdCc = cc ? parseRecipients(cc) : [];
+        result = await emailApi.forward(accountId, prefill.replyToId, buildPayload({
+          forwardTo: fwdTo, forwardCc: fwdCc,
+        }));
       } else {
-        result = await emailApi.sendMessage(accountId, payload);
+        result = await emailApi.sendMessage(accountId, buildPayload());
       }
 
       onSent(result);
@@ -304,15 +323,10 @@ function ComposeOverlay({ accountId, accounts, onClose, onSent, prefill }) {
 
   const handleSaveDraft = async () => {
     try {
-      await emailApi.sendMessage(accountId, {
+      await emailApi.sendMessage(accountId, buildPayload({
         to: to ? parseRecipients(to) : [],
-        cc: cc ? parseRecipients(cc) : [],
-        bcc: bcc ? parseRecipients(bcc) : [],
-        subject,
-        body_html: `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:14px;line-height:1.5;color:#1f2937;">${textToHtml(body)}</div>`,
-        body_text: body,
         draft: true,
-      });
+      }));
       notify('Draft saved');
       onClose();
     } catch (err) {
