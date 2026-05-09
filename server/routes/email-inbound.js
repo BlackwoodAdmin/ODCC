@@ -506,11 +506,25 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
         // 20. Forwarding
         // ------------------------------------------------------------------
         if (account.forwarding_address && account.forwarding_mode !== 'none') {
+          // After keepCidLinks landed, forwarded HTML retains literal cid:
+          // references that the recipient's MTA cannot resolve. Strip the
+          // <img src="cid:..."> tags and append a one-line note. Inline
+          // restoration via attached parts is a separate, larger change
+          // (sendEmail() does not yet accept attachments).
+          let forwardHtml = bodyHtml || `<pre>${escapeHtml(bodyText || '')}</pre>`;
+          let strippedCount = 0;
+          forwardHtml = forwardHtml.replace(/<img\b[^>]*\bsrc=["']cid:[^"']*["'][^>]*>/gi, () => {
+            strippedCount += 1;
+            return '';
+          });
+          if (strippedCount) {
+            forwardHtml += `<p style="color:#666;font-size:12px;font-style:italic;">[${strippedCount} inline image${strippedCount === 1 ? '' : 's'} omitted from forward — view the original in the dashboard]</p>`;
+          }
           try {
             await sendEmail({
               to: account.forwarding_address,
               subject: `Fwd: ${subject || '(no subject)'}`,
-              html: bodyHtml || `<pre>${escapeHtml(bodyText || '')}</pre>`,
+              html: forwardHtml,
             });
             await emailLog('info', 'forward', 'Forwarded inbound email', {
               account_id: account.id, to: account.forwarding_address, message_id: mimeMessageId,
