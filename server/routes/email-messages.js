@@ -148,7 +148,7 @@ async function cleanupTempFiles(files) {
   }
 }
 
-async function buildInlineImageMaps(attachments) {
+async function buildInlineImageMaps(attachments, messageId) {
   const candidates = attachments
     .filter((a) => a.content_id && INLINE_IMAGE_TYPES.has(a.content_type))
     // Smallest-first, tiebreak by id ascending. Without this, adversarial mail
@@ -180,10 +180,16 @@ async function buildInlineImageMaps(attachments) {
   );
 
   let totalRaw = 0;
+  let included = 0;
+  let dropped = 0;
   for (const r of reads) {
     if (!r) continue;
-    if (totalRaw + r.buf.length > AGGREGATE_RAW_CAP) continue;
+    if (totalRaw + r.buf.length > AGGREGATE_RAW_CAP) {
+      dropped += 1;
+      continue;
+    }
     totalRaw += r.buf.length;
+    included += 1;
     const dataUri = `data:${r.att.content_type};base64,${r.buf.toString('base64')}`;
     cidMap.set(String(r.att.content_id).toLowerCase(), dataUri);
     // storage_path is "attachments/<uuid>/<basename>"; the legacy in-HTML
@@ -191,6 +197,21 @@ async function buildInlineImageMaps(attachments) {
     const inHtmlPath = '/data/' + String(r.att.storage_path).replace(/^\/+/, '');
     pathMap.set(inHtmlPath, dataUri);
   }
+
+  if (dropped > 0) {
+    try {
+      await emailLog('warn', 'render', 'Inline image aggregate cap reached, images dropped', {
+        message_id: messageId,
+        dropped,
+        included,
+        total_raw_bytes: totalRaw,
+        cap_bytes: AGGREGATE_RAW_CAP,
+      });
+    } catch (logErr) {
+      console.error('[render] aggregate-cap log failed:', logErr.message);
+    }
+  }
+
   return { cidMap, pathMap };
 }
 
@@ -758,7 +779,7 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
 
     // Resolve inline images (cid: + legacy /data/attachments/...) to data URIs.
     if (message.body_html) {
-      const { cidMap, pathMap } = await buildInlineImageMaps(allAttachments);
+      const { cidMap, pathMap } = await buildInlineImageMaps(allAttachments, msgId);
       message.body_html = rewriteInlineImages(message.body_html, cidMap, pathMap);
     }
 
