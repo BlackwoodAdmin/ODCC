@@ -801,6 +801,12 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
     );
     const allAttachments = attachmentsResult.rows;
 
+    // Capture the pre-rewrite body for the visibleAttachments filter below.
+    // After rewriteInlineImages substitutes cid: → data:, the body no longer
+    // contains the cid: token, so the filter needs the original to decide
+    // which attachments are actually inline-referenced vs. orphan.
+    const originalBodyHtmlLc = (message.body_html || '').toLowerCase();
+
     // Resolve inline images (cid: + legacy /data/attachments/...) to data URIs.
     if (message.body_html) {
       const { cidMap, pathMap } = await buildInlineImageMaps(allAttachments, msgId);
@@ -838,10 +844,17 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
       }
     }
 
-    // Hide inline images from the user-visible attachment list. Non-image
-    // inline attachments (rare) stay visible. Strip storage_path from response.
+    // Hide inline images from the user-visible attachment list ONLY when
+    // they are actually referenced in the body via cid:. Gmail (and other
+    // MTAs) set Content-ID on every image attachment, including ones the
+    // sender attached without inlining — those are orphans and must remain
+    // visible as downloadable attachments.
     const visibleAttachments = allAttachments
-      .filter((a) => !(a.content_id && INLINE_IMAGE_TYPES.has(a.content_type)))
+      .filter((a) => !(
+        a.content_id
+        && INLINE_IMAGE_TYPES.has(a.content_type)
+        && originalBodyHtmlLc.includes(`cid:${String(a.content_id).toLowerCase()}`)
+      ))
       .map(({ storage_path, ...rest }) => ({
         ...rest,
         size: rest.size_bytes,
