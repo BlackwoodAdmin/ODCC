@@ -288,25 +288,36 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
       }
 
       // Process MIME attachments (for inline CID images and attachments not in multer)
+      const claimed = new Set();
+      const nfc = (s) => (s == null ? s : String(s).normalize('NFC'));
       if (parsedMime?.attachments?.length) {
         for (const att of parsedMime.attachments) {
-          // Check if this attachment was already handled by multer (by filename match)
-          const alreadyHandled = attachmentRecords.some(
-            (r) => r.filename === att.filename && Math.abs(r.size_bytes - att.size) < 100
-          );
-          if (alreadyHandled) {
-            // If it has a CID, update the existing record
-            if (att.contentId) {
-              const existing = attachmentRecords.find(
-                (r) => r.filename === att.filename && Math.abs(r.size_bytes - att.size) < 100
-              );
-              if (existing) existing.content_id = stripCid(att.contentId);
-            }
+          const cid = stripCid(att.contentId);
+          const attName = nfc(att.filename);
+          let matchIdx = -1;
+          if (cid) {
+            matchIdx = attachmentRecords.findIndex(
+              (r, i) => !claimed.has(i) && r.content_id === cid
+            );
+          }
+          if (matchIdx === -1) {
+            matchIdx = attachmentRecords.findIndex(
+              (r, i) => !claimed.has(i) && !r.content_id
+                && nfc(r.filename) === attName
+                && Math.abs(r.size_bytes - att.size) < 100
+            );
+          }
+          if (matchIdx !== -1) {
+            const existing = attachmentRecords[matchIdx];
+            if (cid && !existing.content_id) existing.content_id = cid;
+            claimed.add(matchIdx);
             continue;
           }
 
-          // Save MIME attachment to temp
-          if (att.content) {
+          // Save MIME attachment to temp. Require non-empty content: mailparser
+          // surfaces empty inline parts as a 0-length Buffer (truthy), and a
+          // bare `if (att.content)` would persist a phantom 0-byte attachment.
+          if (att.content && att.content.length > 0) {
             const attFilename = `${Date.now()}-${crypto.randomUUID()}-${att.filename || 'attachment'}`;
             const tmpPath = path.join(TMP_DIR, attFilename);
             await fs.mkdir(TMP_DIR, { recursive: true });
@@ -315,7 +326,6 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
 
             const ext = path.extname(att.filename || '').toLowerCase();
             const isBlocked = BLOCKED_EXTENSIONS.has(ext);
-            const contentId = stripCid(att.contentId);
 
             attachmentRecords.push({
               filename: att.filename || 'attachment',
@@ -324,9 +334,17 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
               temp_path: tmpPath,
               final_path: path.join(finalAttachmentDir, attFilename),
               storage_path: `attachments/${attachmentUuid}/${attFilename}`,
-              content_id: contentId,
+              content_id: cid,
               is_blocked: isBlocked,
             });
+            claimed.add(attachmentRecords.length - 1);
+          } else {
+            await emailLog('warn', 'inbound', 'MIME attachment had no content payload', {
+              filename: att.filename,
+              content_id: cid,
+              content_type: att.contentType,
+              content_buffer_length: att.content?.length ?? null,
+            }).catch(() => {});
           }
         }
       }
