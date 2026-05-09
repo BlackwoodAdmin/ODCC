@@ -25,6 +25,12 @@ const MAX_HTML_BYTES = 1024 * 1024; // 1 MB
 const RATE_LIMIT_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
 const RATE_LIMIT_MAX = 100;
 
+function stripCid(raw) {
+  if (!raw) return null;
+  const cleaned = String(raw).replace(/[<>]/g, '').trim().replace(/^["']+|["']+$/g, '');
+  return cleaned || null;
+}
+
 // ---------------------------------------------------------------------------
 // Multer config — disk storage, 25 MB limit
 // ---------------------------------------------------------------------------
@@ -294,7 +300,7 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
               const existing = attachmentRecords.find(
                 (r) => r.filename === att.filename && Math.abs(r.size_bytes - att.size) < 100
               );
-              if (existing) existing.content_id = att.contentId.replace(/[<>]/g, '');
+              if (existing) existing.content_id = stripCid(att.contentId);
             }
             continue;
           }
@@ -309,7 +315,7 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
 
             const ext = path.extname(att.filename || '').toLowerCase();
             const isBlocked = BLOCKED_EXTENSIONS.has(ext);
-            const contentId = att.contentId ? att.contentId.replace(/[<>]/g, '') : null;
+            const contentId = stripCid(att.contentId);
 
             attachmentRecords.push({
               filename: att.filename || 'attachment',
