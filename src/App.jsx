@@ -6,6 +6,7 @@ import MainLayout from './components/layout/MainLayout';
 import ProtectedRoute from './components/common/ProtectedRoute';
 import Home from './pages/Home';
 import About from './pages/About';
+import OurPastor from './pages/OurPastor';
 import Services from './pages/Services';
 import Events from './pages/Events';
 import Blog from './pages/Blog';
@@ -51,6 +52,7 @@ export default function App() {
             <Route element={<MainLayout />}>
               <Route path="/" element={<Home />} />
               <Route path="/about" element={<About />} />
+              <Route path="/our-pastor" element={<OurPastor />} />
               <Route path="/services" element={<Services />} />
               <Route path="/events" element={<Events />} />
               <Route path="/blog" element={<Blog />} />

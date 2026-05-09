@@ -22,6 +22,7 @@ export default function Header() {
 
   const aboutLinks = [
     { to: '/about', label: 'About Us' },
+    { to: '/our-pastor', label: 'Our Pastor' },
     { to: '/joy-ladies-circle', label: 'J.O.Y. Ladies' },
     { to: '/contact', label: 'Contact Us' },
     { to: '/blog', label: 'Blog' },
