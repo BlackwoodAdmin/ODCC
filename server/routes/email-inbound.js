@@ -102,7 +102,7 @@ router.post('/inbound/:token', upload.any(), async (req, res) => {
     let parsedMime = null;
     if (sgRawMime) {
       try {
-        parsedMime = await simpleParser(sgRawMime);
+        parsedMime = await simpleParser(sgRawMime, { keepCidLinks: true });
       } catch (err) {
         await emailLog('warn', 'inbound', 'Failed to parse raw MIME', { error: err.message });
       }
