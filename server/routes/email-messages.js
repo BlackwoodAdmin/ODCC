@@ -149,9 +149,14 @@ async function cleanupTempFiles(files) {
 }
 
 async function buildInlineImageMaps(attachments) {
-  const candidates = attachments.filter(
-    (a) => a.content_id && INLINE_IMAGE_TYPES.has(a.content_type)
-  );
+  const candidates = attachments
+    .filter((a) => a.content_id && INLINE_IMAGE_TYPES.has(a.content_type))
+    // Smallest-first, tiebreak by id ascending. Without this, adversarial mail
+    // with hundreds of inline images otherwise gets an arbitrary 100 selected
+    // by Postgres row order. Smallest-first prefers the cheap reads so legitimate
+    // small inline images render even when oversized ones are present.
+    .sort((a, b) => (a.size_bytes - b.size_bytes) || (a.id - b.id))
+    .slice(0, 100);
   const cidMap = new Map();
   const pathMap = new Map();
   if (!candidates.length) return { cidMap, pathMap };
