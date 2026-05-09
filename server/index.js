@@ -200,6 +200,34 @@ app.get('/blog/:slug', async (req, res) => {
   }
 });
 
+// Our Pastor page — inject OGP tags so social shares show the pastor photo
+// and bio summary instead of the homepage defaults.
+app.get('/our-pastor', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  const siteUrl = 'https://opendoorchristian.church';
+  const ogTitle = 'Meet Pastor Stephen Presley';
+  const ogDescription = 'Pastor Stephen Presley serves Open Door Christian Church in DeLand, Florida — a calling forty years in the making.';
+  const ogImage = `${siteUrl}/our-pastor.jpg`;
+  const ogTags = `
+  <title>${ogTitle} - Open Door Christian Church</title>
+  <meta name="description" content="${ogDescription}" />
+  <meta property="og:title" content="${ogTitle}" />
+  <meta property="og:description" content="${ogDescription}" />
+  <meta property="og:image" content="${ogImage}" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:type" content="profile" />
+  <meta property="og:url" content="${siteUrl}/our-pastor" />
+  <meta property="fb:app_id" content="949925117923722" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${ogTitle}" />
+  <meta name="twitter:description" content="${ogDescription}" />
+  <meta name="twitter:image" content="${ogImage}" />`;
+  let html = indexHtml.replace(/<title>[^<]*<\/title>/, '');
+  html = html.replace(/<meta\s+(?:property="(?:og|fb):[^"]*"|name="twitter:[^"]*"|name="description")[^>]*\/?\s*>\s*/g, '');
+  html = html.replace('</head>', ogTags + '\n</head>');
+  res.type('html').send(html);
+});
+
 // Catch-all route for SPA
 app.get('*', (req, res) => {
   res.set('Cache-Control', 'no-cache');
