@@ -216,7 +216,7 @@ async function buildInlineImageMaps(attachments, messageId) {
 }
 
 function rewriteInlineImages(html, cidMap, pathMap) {
-  if (!html) return html;
+  if (!html) return { html, unresolvedCids: [] };
   let out = html;
   // Function form of replace is required: base64 payloads contain `$`, which
   // the string form interprets as backreferences ($&, $1, $$) and corrupts.
@@ -225,13 +225,37 @@ function rewriteInlineImages(html, cidMap, pathMap) {
     const cidRe = new RegExp(`cid:(${alts})`, 'gi');
     out = out.replace(cidRe, (match, id) => cidMap.get(id.toLowerCase()) ?? match);
   }
+  // Any cid: token still in `out` after the substitution above is genuinely
+  // unresolved (not in the cidMap). The pathMap pass below only substitutes
+  // URL-shaped tokens, never introduces new cid: tokens, so scanning here vs.
+  // after pathMap yields identical results — placement is for code clarity.
+  // The regex anchors on `<img ... src="cid:` so won't false-match data: URIs
+  // already inserted by the cidMap pass.
+  const unresolvedCids = new Set();
+  const stillCidRe = /<img\b[^>]+\bsrc=["']cid:([^"']+)/gi;
+  for (const m of out.matchAll(stillCidRe)) {
+    unresolvedCids.add(m[1].toLowerCase());
+  }
   if (pathMap.size) {
     const alts = [...pathMap.keys()].map(regexEscape).join('|');
     const pathRe = new RegExp(alts, 'g');
     out = out.replace(pathRe, (match) => pathMap.get(match) ?? match);
   }
-  return out;
+  return { html: out, unresolvedCids: [...unresolvedCids] };
 }
+
+// Bounded LRU-ish cache: dedupes unresolved-cid render warns within a 24h
+// window. Cleared on process restart (acceptable — at most one extra row per
+// restart). Capped at 1000 entries to bound memory under adversarial input;
+// oldest entry evicted on insert when full.
+//
+// Invariant: digest is computed over the SET of unresolved cids in this
+// render, not over the message version. Re-rendering the same message with a
+// different unresolved-cid set fires a new log; same set within 24h stays
+// deduped.
+const UNRESOLVED_CID_LOG_TTL = 24 * 60 * 60 * 1000;
+const UNRESOLVED_CID_LOG_MAX = 1000;
+const unresolvedCidLogCache = new Map();
 
 const router = Router();
 
@@ -780,7 +804,38 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
     // Resolve inline images (cid: + legacy /data/attachments/...) to data URIs.
     if (message.body_html) {
       const { cidMap, pathMap } = await buildInlineImageMaps(allAttachments, msgId);
-      message.body_html = rewriteInlineImages(message.body_html, cidMap, pathMap);
+      const { html, unresolvedCids } = rewriteInlineImages(message.body_html, cidMap, pathMap);
+      message.body_html = html;
+
+      try {
+        if (unresolvedCids.length) {
+          const digest = crypto.createHash('sha1')
+            .update([...unresolvedCids].sort().join(','))
+            .digest('hex')
+            .slice(0, 16);
+          const cacheKey = `${msgId}:${digest}`;
+          const nowMs = Date.now();
+          const expiresAt = unresolvedCidLogCache.get(cacheKey);
+          if (!expiresAt || expiresAt < nowMs) {
+            if (unresolvedCidLogCache.size >= UNRESOLVED_CID_LOG_MAX) {
+              const firstKey = unresolvedCidLogCache.keys().next().value;
+              unresolvedCidLogCache.delete(firstKey);
+            }
+            unresolvedCidLogCache.set(cacheKey, nowMs + UNRESOLVED_CID_LOG_TTL);
+            // Cap raw-id leakage: at most 5 ids, each truncated to 64 chars.
+            // Some MTAs encode user-identifying tokens in Content-ID values.
+            const sample = unresolvedCids.slice(0, 5).map((s) => s.slice(0, 64));
+            await emailLog('warn', 'render', 'Unresolved cid: tokens after rewrite', {
+              message_id: msgId,
+              cid_digest: digest,
+              unresolved_count: unresolvedCids.length,
+              unresolved_sample: sample,
+            });
+          }
+        }
+      } catch (logErr) {
+        console.error('[render] unresolved-cid log failed:', logErr.message);
+      }
     }
 
     // Hide inline images from the user-visible attachment list. Non-image

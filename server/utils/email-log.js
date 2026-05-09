@@ -3,7 +3,7 @@ import { query } from '../db.js';
 /**
  * Log to the email_system_logs table.
  * @param {'error'|'warn'|'info'} level
- * @param {string} category - 'inbound'|'outbound'|'forward'|'auto_reply'|'bounce'|'cron'|'quota'|'rate_limit'|'disk'
+ * @param {string} category - 'inbound'|'outbound'|'forward'|'auto_reply'|'bounce'|'cron'|'quota'|'rate_limit'|'disk'|'render'
  * @param {string} message
  * @param {object|null} details
  */
