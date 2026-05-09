@@ -1,16 +1,18 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
 import RegisterModal from '../RegisterModal';
 import PrayerRequestModal from '../PrayerRequestModal';
 
 export default function Header() {
   const { user, logout } = useAuth();
+  const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [prayerOpen, setPrayerOpen] = useState(false);
   const aboutRef = useRef(null);
+  const aboutMobileRef = useRef(null);
   const aboutTimeout = useRef(null);
 
   const navLinks = [
@@ -28,10 +30,15 @@ export default function Header() {
     { to: '/blog', label: 'Blog' },
   ];
 
-  // Close About dropdown on outside click
+  // Close About dropdown on outside click. Must check BOTH desktop and mobile
+  // containers — the mobile submenu is rendered in a different subtree, so
+  // without aboutMobileRef every mousedown inside the mobile menu would unmount
+  // the submenu before click could fire on a link.
   useEffect(() => {
     const handleClick = (e) => {
-      if (aboutRef.current && !aboutRef.current.contains(e.target)) setAboutOpen(false);
+      const inDesktop = aboutRef.current?.contains(e.target);
+      const inMobile = aboutMobileRef.current?.contains(e.target);
+      if (!inDesktop && !inMobile) setAboutOpen(false);
     };
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -48,7 +55,7 @@ export default function Header() {
   const linkClass = ({ isActive }) =>
     `font-medium transition-colors duration-200 ${isActive ? 'text-sage' : 'text-charcoal hover:text-sage'}`;
 
-  const aboutIsActive = ['/about', '/joy-ladies-circle', '/contact', '/blog'].includes(location.pathname);
+  const aboutIsActive = ['/about', '/our-pastor', '/joy-ladies-circle', '/contact', '/blog'].includes(location.pathname);
 
   return (
     <>
@@ -129,7 +136,7 @@ export default function Header() {
                 ))}
 
                 {/* Mobile About submenu */}
-                <div>
+                <div ref={aboutMobileRef}>
                   <button
                     onClick={() => setAboutOpen(!aboutOpen)}
                     className={`font-medium transition-colors duration-200 flex items-center gap-1 w-full ${aboutIsActive ? 'text-sage' : 'text-charcoal hover:text-sage'}`}
