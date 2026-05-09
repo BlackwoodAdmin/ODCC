@@ -200,33 +200,95 @@ app.get('/blog/:slug', async (req, res) => {
   }
 });
 
-// Our Pastor page — inject OGP tags so social shares show the pastor photo
-// and bio summary instead of the homepage defaults.
-app.get('/our-pastor', (req, res) => {
-  res.set('Cache-Control', 'no-cache');
-  const siteUrl = 'https://opendoorchristian.church';
-  const ogTitle = 'Meet Pastor Stephen Presley';
-  const ogDescription = 'Pastor Stephen Presley serves Open Door Christian Church in DeLand, Florida — a calling forty years in the making.';
-  const ogImage = `${siteUrl}/our-pastor.jpg`;
+// Static-page OG tag injection. Without this, every public page below
+// falls through to the SPA catch-all and gets the homepage's OG tags,
+// so social shares show homepage imagery regardless of which page was
+// shared. The /blog/:slug handler above stays separate because its
+// values are dynamic (per-post).
+const SITE_URL = 'https://opendoorchristian.church';
+const DEFAULT_OG_IMAGE = `${SITE_URL}/uploads/church-header.jpg`;
+
+function renderWithOg({ title, description, image = DEFAULT_OG_IMAGE, type = 'website', urlPath }) {
+  const ogImageType = image.toLowerCase().endsWith('.png') ? 'image/png'
+    : image.toLowerCase().endsWith('.gif') ? 'image/gif' : 'image/jpeg';
+  const ogTitle = escapeHtml(title);
+  const ogDescription = escapeHtml(description);
   const ogTags = `
-  <title>${ogTitle} - Open Door Christian Church</title>
+  <title>${ogTitle}</title>
   <meta name="description" content="${ogDescription}" />
   <meta property="og:title" content="${ogTitle}" />
   <meta property="og:description" content="${ogDescription}" />
-  <meta property="og:image" content="${ogImage}" />
-  <meta property="og:image:type" content="image/jpeg" />
-  <meta property="og:type" content="profile" />
-  <meta property="og:url" content="${siteUrl}/our-pastor" />
+  <meta property="og:image" content="${image}" />
+  <meta property="og:image:type" content="${ogImageType}" />
+  <meta property="og:type" content="${type}" />
+  <meta property="og:url" content="${SITE_URL}${urlPath}" />
   <meta property="fb:app_id" content="949925117923722" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${ogTitle}" />
   <meta name="twitter:description" content="${ogDescription}" />
-  <meta name="twitter:image" content="${ogImage}" />`;
+  <meta name="twitter:image" content="${image}" />`;
   let html = indexHtml.replace(/<title>[^<]*<\/title>/, '');
   html = html.replace(/<meta\s+(?:property="(?:og|fb):[^"]*"|name="twitter:[^"]*"|name="description")[^>]*\/?\s*>\s*/g, '');
-  html = html.replace('</head>', ogTags + '\n</head>');
-  res.type('html').send(html);
-});
+  return html.replace('</head>', ogTags + '\n</head>');
+}
+
+const STATIC_OG_PAGES = [
+  {
+    path: '/about',
+    title: 'About Our Church - Open Door Christian Church',
+    description: 'Founded in 1986, Open Door Christian Church serves DeLand, Florida with Scripture-based, Christ-centered worship — including our beloved drive-in service on 87.9 FM.',
+  },
+  {
+    path: '/services',
+    title: 'Service Times - Open Door Christian Church',
+    description: 'Join us for worship at Open Door Christian Church in DeLand, Florida. Communion every Sunday and our unique drive-in service tradition.',
+  },
+  {
+    path: '/events',
+    title: 'Events - Open Door Christian Church',
+    description: 'See upcoming worship services, community events, and fellowship opportunities at Open Door Christian Church in DeLand, Florida.',
+  },
+  {
+    path: '/blog',
+    title: 'Blog - Open Door Christian Church',
+    description: 'Read the latest from Open Door Christian Church — sermons, devotionals, community news, and reflections on faith.',
+  },
+  {
+    path: '/give',
+    title: 'Give - Open Door Christian Church',
+    description: 'Support the ministry of Open Door Christian Church through online giving. Your generosity helps us serve DeLand and beyond.',
+  },
+  {
+    path: '/contact',
+    title: 'Contact Us - Open Door Christian Church',
+    description: 'Get in touch with Open Door Christian Church in DeLand, Florida. Submit a prayer request or send us a message.',
+  },
+  {
+    path: '/joy-ladies-circle',
+    title: 'J.O.Y. Ladies Circle - Open Door Christian Church',
+    description: 'Jesus · Others · Yourself. All women are welcome at the J.O.Y. Ladies Circle of Open Door Christian Church in DeLand, Florida.',
+  },
+  {
+    path: '/our-pastor',
+    title: 'Meet Pastor Stephen Presley - Open Door Christian Church',
+    description: 'Pastor Stephen Presley serves Open Door Christian Church in DeLand, Florida — a calling forty years in the making.',
+    image: `${SITE_URL}/our-pastor.jpg`,
+    type: 'profile',
+  },
+];
+
+for (const page of STATIC_OG_PAGES) {
+  app.get(page.path, (req, res) => {
+    res.set('Cache-Control', 'no-cache');
+    res.type('html').send(renderWithOg({
+      title: page.title,
+      description: page.description,
+      image: page.image,
+      type: page.type,
+      urlPath: page.path,
+    }));
+  });
+}
 
 // Catch-all route for SPA
 app.get('*', (req, res) => {
