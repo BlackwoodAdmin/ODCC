@@ -158,8 +158,8 @@ app.get('/blog/:slug', async (req, res) => {
     const siteUrl = 'https://opendoorchristian.church';
     const postUrl = `${siteUrl}/blog/${slug}`;
 
-    let ogImage = `${siteUrl}/uploads/church-header.jpg`;
-    let ogImageType = 'image/jpeg';
+    let ogImage = `${siteUrl}/uploads/church-header.webp`;
+    let ogImageType = 'image/webp';
     if (post.featured_image) {
       ogImage = post.featured_image.startsWith('http')
         ? post.featured_image
@@ -168,6 +168,7 @@ app.get('/blog/:slug', async (req, res) => {
       if (ext === 'jpg' || ext === 'jpeg') ogImageType = 'image/jpeg';
       else if (ext === 'png') ogImageType = 'image/png';
       else if (ext === 'gif') ogImageType = 'image/gif';
+      else if (ext === 'webp') ogImageType = 'image/webp';
     }
 
     const ogTitle = escapeHtml(post.title || 'Blog Post');
@@ -206,11 +207,12 @@ app.get('/blog/:slug', async (req, res) => {
 // shared. The /blog/:slug handler above stays separate because its
 // values are dynamic (per-post).
 const SITE_URL = 'https://opendoorchristian.church';
-const DEFAULT_OG_IMAGE = `${SITE_URL}/uploads/church-header.jpg`;
+const DEFAULT_OG_IMAGE = `${SITE_URL}/uploads/church-header.webp`;
 
 function renderWithOg({ title, description, image = DEFAULT_OG_IMAGE, type = 'website', urlPath }) {
   const ogImageType = image.toLowerCase().endsWith('.png') ? 'image/png'
-    : image.toLowerCase().endsWith('.gif') ? 'image/gif' : 'image/jpeg';
+    : image.toLowerCase().endsWith('.gif') ? 'image/gif'
+    : image.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/jpeg';
   const ogTitle = escapeHtml(title);
   const ogDescription = escapeHtml(description);
   const ogTags = `
@@ -272,7 +274,7 @@ const STATIC_OG_PAGES = [
     path: '/our-pastor',
     title: 'Meet Pastor Stephen Presley - Open Door Christian Church',
     description: 'Pastor Stephen Presley serves Open Door Christian Church in DeLand, Florida — a calling forty years in the making.',
-    image: `${SITE_URL}/our-pastor.jpg`,
+    image: `${SITE_URL}/our-pastor.webp`,
     type: 'profile',
   },
 ];

@@ -16,7 +16,7 @@ export default function Home() {
       {/* Hero */}
       <section className="relative h-[85vh] min-h-[600px] flex items-center justify-center">
         <div className="absolute inset-0">
-          <img src="/uploads/church-header.jpg" alt="Open Door Christian Church" className="w-full h-full object-cover" />
+          <img src="/uploads/church-header.webp" alt="Open Door Christian Church" className="w-full h-full object-cover" />
           <div className="hero-overlay absolute inset-0"></div>
         </div>
         <div className="relative z-10 text-center text-white px-4 max-w-4xl">

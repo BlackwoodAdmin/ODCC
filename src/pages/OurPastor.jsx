@@ -16,7 +16,7 @@ export default function OurPastor() {
           <div className="max-w-4xl mx-auto">
             <div className="rounded-xl overflow-hidden shadow-lg mb-12">
               <img
-                src="/our-pastor.jpg"
+                src="/our-pastor.webp"
                 alt="Pastor Stephen Presley"
                 className="w-full h-auto"
                 loading="eager"
