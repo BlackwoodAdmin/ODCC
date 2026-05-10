@@ -48,7 +48,8 @@ export default function OurPastor() {
               </p>
               <p className="leading-relaxed">
                 His family's ministry roots in this region run deep. His great-grandfather Cicero
-                served in the Restoration Movement tradition at Pleasant Hill Christian Church,
+                served in the Restoration Movement tradition at Pleasant Hill Christian Church in
+                Jasper, GA,
                 his father Charles was ordained at the same church in 1950, and his great aunts
                 Ruby and Grace served alongside that congregation as well. A brother and a dozen
                 first cousins have served as ministers, Bible college presidents, and professors from
@@ -71,7 +72,7 @@ export default function OurPastor() {
               <p className="leading-relaxed mb-6">
                 Before stepping into pastoral ministry, Steve built a varied and faithful working
                 life. He served four years in the United States Navy as an Aviation Electronics
-                Technician, holding a Secret clearance and completing advanced technical training
+                Technician, holding a Top Secret clearance and completing advanced technical training
                 in avionics and electrical systems. After the Navy, he worked as a Customer
                 Service Engineer for Xerox Corporation, diagnosing and repairing complex
                 electromechanical systems and supporting customers across his service territory.
