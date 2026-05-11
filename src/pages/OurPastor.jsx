@@ -49,9 +49,8 @@ export default function OurPastor() {
               <p className="leading-relaxed">
                 His family's ministry roots in this region run deep. His great-grandfather Cicero
                 served in the Restoration Movement tradition at Pleasant Hill Christian Church in
-                Jasper, GA,
-                his father Charles was ordained at the same church in 1950, and his great aunts
-                Ruby and Grace served alongside that congregation as well. A brother and a dozen
+                Jasper, GA. His father Charles was ordained there in 1950, and his great aunts
+                Ruby and Grace served alongside that congregation. A brother and a dozen
                 first cousins have served as ministers, Bible college presidents, and professors from
                 Cincinnati to Florida. Steve's own ordination on Easter Sunday 2026 was at The
                 Christian Church at DeLeon Springs, where he has been a member for twenty years.
