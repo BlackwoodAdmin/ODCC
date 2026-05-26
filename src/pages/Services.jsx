@@ -11,7 +11,7 @@ export default function Services() {
     {
       time: '9:00 AM', name: 'Drive-In Service (Garden, FM 87.9)', day: 'Sunday',
       desc: 'Worship right from your car. Roll the windows down, tune in, and let the morning come to you. Pajamas welcome. Coffee in hand. Kids in the back seat. No dress code, no pressure — just worship under the Florida sky.',
-      icon: '🚗', highlight: true
+      icon: '🚗', highlight: true, radio: true
     },
     {
       time: '10:15 AM', name: 'Bible Study (Chapel)', day: 'Sunday',
@@ -21,7 +21,7 @@ export default function Services() {
     {
       time: '11:00 AM', name: 'Indoor Chapel Service (Chapel)', day: 'Sunday',
       desc: 'Our full worship service in the air-conditioned chapel — hymns, communion, prayer, and the message. The same sermon as the drive-in, so come whichever way fits you best.',
-      icon: '⛪'
+      icon: '⛪', highlight: true
     },
     {
       time: '6:00 PM', name: 'Wednesday Bible Study', day: 'Wednesday',
@@ -50,7 +50,7 @@ export default function Services() {
                     <div className="flex flex-wrap items-center gap-3 mb-2">
                       <span className="bg-sage text-white px-3 py-1 rounded-full text-sm font-semibold">{s.day}</span>
                       <span className="text-2xl font-bold text-charcoal">{s.time}</span>
-                      {s.highlight && <span className="bg-earth text-white px-3 py-1 rounded-full text-xs font-semibold">87.9 FM</span>}
+                      {s.radio && <span className="bg-earth text-white px-3 py-1 rounded-full text-xs font-semibold">87.9 FM</span>}
                     </div>
                     <h3 className="text-2xl font-bold text-charcoal mb-3">{s.name}</h3>
                     <p className="text-gray-600 leading-relaxed">{s.desc}</p>
