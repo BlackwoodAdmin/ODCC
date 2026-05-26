@@ -77,7 +77,7 @@ export default function Contact() {
                 <div className="bg-cream rounded-xl p-6">
                   <h3 className="font-bold text-charcoal mb-2">🕒 Service Times</h3>
                   <div className="text-gray-600 text-sm space-y-1">
-                    <p><strong>Sunday:</strong> 8:30 AM Drive-In, 9:45 AM Bible Study, 10:30 AM Chapel</p>
+                    <p><strong>Sunday:</strong> 8:30 AM Fellowship, 9:00 AM Drive-In (FM 87.9), 10:15 AM Bible Study, 11:00 AM Indoor Chapel</p>
                     <p><strong>Wednesday:</strong> 6:00 PM Bible Study</p>
                   </div>
                 </div>

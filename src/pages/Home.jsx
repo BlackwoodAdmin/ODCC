@@ -35,9 +35,10 @@ export default function Home() {
       <section className="bg-sage text-white py-6">
         <div className="container-custom">
           <div className="flex flex-wrap justify-center gap-6 md:gap-12 text-center text-sm md:text-base">
-            <div><span className="font-bold">Drive-In</span> <span className="opacity-80">Sun 8:30 AM · 87.9 FM</span></div>
-            <div><span className="font-bold">Bible Study</span> <span className="opacity-80">Sun 9:45 AM</span></div>
-            <div><span className="font-bold">Chapel</span> <span className="opacity-80">Sun 10:30 AM</span></div>
+            <div><span className="font-bold">Fellowship</span> <span className="opacity-80">Sun 8:30 AM</span></div>
+            <div><span className="font-bold">Drive-In</span> <span className="opacity-80">Sun 9:00 AM · FM 87.9</span></div>
+            <div><span className="font-bold">Bible Study</span> <span className="opacity-80">Sun 10:15 AM</span></div>
+            <div><span className="font-bold">Chapel</span> <span className="opacity-80">Sun 11:00 AM</span></div>
 
             <div><span className="font-bold">Wednesday</span> <span className="opacity-80">6:00 PM</span></div>
           </div>
@@ -90,7 +91,7 @@ export default function Home() {
               <span className="text-sage font-semibold text-sm uppercase tracking-wider">Unique to ODCC</span>
               <h2 className="text-4xl font-bold text-charcoal mt-2 mb-6">Drive-In Church Service</h2>
               <p className="text-gray-600 leading-relaxed mb-4">
-                Every Sunday at 8:30 AM, our preacher and praise team take to the 2nd floor balcony to lead 
+                Every Sunday at 9:00 AM, our preacher and praise team take to the 2nd floor balcony to lead
                 worship outdoors. Tune your car radio to <strong>87.9 FM</strong> and enjoy the service from 
                 the comfort of your vehicle.
               </p>
@@ -108,7 +109,7 @@ export default function Home() {
                 <div className="text-6xl mb-4">📻</div>
                 <h3 className="text-2xl font-bold text-charcoal mb-2">87.9 FM</h3>
                 <p className="text-sage font-semibold mb-2">Drive-In Radio Frequency</p>
-                <p className="text-gray-500 text-sm">Tune in from the parking lot every Sunday at 8:30 AM</p>
+                <p className="text-gray-500 text-sm">Tune in from the parking lot every Sunday at 9:00 AM</p>
                 <div className="mt-6 border-t border-sage/20 pt-6">
                   <p className="text-charcoal font-medium">What to Expect:</p>
                   <ul className="text-gray-600 text-sm mt-2 space-y-1">

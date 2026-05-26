@@ -4,18 +4,23 @@ import { Link } from 'react-router-dom';
 export default function Services() {
   const services = [
     {
-      time: '8:30 AM', name: 'Drive-In Service', day: 'Sunday',
-      desc: 'Our unique outdoor service where the preacher and praise team lead from the 2nd floor balcony. Tune your car radio to 87.9 FM or enjoy the outdoor speakers on the grounds. The fellowship hall is open before and after.',
+      time: '8:30 AM', name: 'Fellowship Time (Chapel)', day: 'Sunday',
+      desc: 'Coffee, breakfast foods, and good fellowship to start the day.',
+      icon: '🌅'
+    },
+    {
+      time: '9:00 AM', name: 'Drive-In Service (Garden, FM 87.9)', day: 'Sunday',
+      desc: 'Worship right from your car. Roll the windows down, tune in, and let the morning come to you. Pajamas welcome. Coffee in hand. Kids in the back seat. No dress code, no pressure — just worship under the Florida sky.',
       icon: '🚗', highlight: true
     },
     {
-      time: '9:45 AM', name: 'Bible Study', day: 'Sunday',
-      desc: 'Join us for in-depth study of God\'s Word. Classes available for all ages. Grow deeper in your understanding of Scripture with fellow believers.',
+      time: '10:15 AM', name: 'Bible Study (Chapel)', day: 'Sunday',
+      desc: 'Bring your Bible, your questions, and an open heart.',
       icon: '📖'
     },
     {
-      time: '10:30 AM', name: 'Chapel Service', day: 'Sunday',
-      desc: 'Our main worship gathering featuring praise and worship, prayer, communion, and Biblical teaching. Communion is served every Sunday.',
+      time: '11:00 AM', name: 'Indoor Chapel Service (Chapel)', day: 'Sunday',
+      desc: 'Our full worship service in the air-conditioned chapel — hymns, communion, prayer, and the message. The same sermon as the drive-in, so come whichever way fits you best.',
       icon: '⛪'
     },
     {
