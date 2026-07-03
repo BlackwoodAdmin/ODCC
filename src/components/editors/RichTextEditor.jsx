@@ -135,12 +135,14 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
     },
   });
 
-  // Sync external value changes (e.g. when editing a different post)
+  // Sync external value changes (e.g. when editing a different post).
+  // Skipped while the HTML source view is open — value echoes textarea
+  // keystrokes then, and toggleHtml applies them on return to visual.
   useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
+    if (editor && !showHtml && value !== editor.getHTML()) {
       editor.commands.setContent(value || '');
     }
-  }, [value]);
+  }, [value, showHtml]);
 
   // Toggle HTML source view
   const toggleHtml = useCallback(() => {
@@ -202,7 +204,10 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       {showHtml ? (
         <textarea
           value={htmlSource}
-          onChange={e => setHtmlSource(e.target.value)}
+          onChange={e => {
+            setHtmlSource(e.target.value);
+            onChange(e.target.value);
+          }}
           className="w-full px-4 py-3 font-mono text-sm min-h-[300px] resize-none outline-none"
         />
       ) : (
