@@ -8,6 +8,21 @@ import Placeholder from '@tiptap/extension-placeholder';
 import { TextStyle } from '@tiptap/extension-text-style';
 import api from '../../services/api';
 
+// Preserve style attributes on images — the schema drops undeclared
+// attributes when HTML-source edits are parsed back into the editor.
+const StyledImage = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      style: {
+        default: null,
+        parseHTML: el => el.getAttribute('style'),
+        renderHTML: attrs => (attrs.style ? { style: attrs.style } : {}),
+      },
+    };
+  },
+});
+
 function ToolbarButton({ onClick, active, children, title }) {
   return (
     <button
@@ -110,7 +125,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
       StarterKit.configure({ heading: { levels: [2, 3] } }),
       Underline,
       Link.configure({ openOnClick: false }),
-      Image.configure({ inline: false }),
+      StyledImage.configure({ inline: false }),
       TextStyle,
       Placeholder.configure({ placeholder }),
     ],
