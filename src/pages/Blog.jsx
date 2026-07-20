@@ -1,10 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useFetch from '../hooks/useFetch';
 import { formatDate } from '../utils/formatters';
 
+const POSTS_PER_PAGE = 18;
+
 export default function Blog() {
-  const { data, loading } = useFetch('/posts');
+  const [page, setPage] = useState(1);
+  const { data, loading } = useFetch(`/posts?limit=${POSTS_PER_PAGE}&page=${page}`);
+  const totalPages = data ? Math.max(1, Math.ceil(data.total / POSTS_PER_PAGE)) : 1;
+
+  const goToPage = (p) => {
+    setPage(p);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div>
@@ -20,6 +29,7 @@ export default function Blog() {
           {loading ? (
             <div className="text-center py-12"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage mx-auto"></div></div>
           ) : data?.posts?.length > 0 ? (
+            <>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {data.posts.map(post => (
                 <Link key={post.id} to={`/blog/${post.slug}`} className="card group">
@@ -40,6 +50,26 @@ export default function Blog() {
                 </Link>
               ))}
             </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-4 mt-12">
+                <button
+                  onClick={() => goToPage(Math.max(1, page - 1))}
+                  disabled={page <= 1}
+                  className="px-5 py-2 bg-sage text-white rounded-lg font-semibold hover:bg-sage/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-gray-600">Page {page} of {totalPages}</span>
+                <button
+                  onClick={() => goToPage(Math.min(totalPages, page + 1))}
+                  disabled={page >= totalPages}
+                  className="px-5 py-2 bg-sage text-white rounded-lg font-semibold hover:bg-sage/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+            </>
           ) : (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📝</div>
