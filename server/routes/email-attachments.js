@@ -4,13 +4,31 @@ import { stat } from 'fs/promises';
 import path from 'path';
 import { query } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { verifyAttachmentSignature, SIGNED_ATTACHMENT_TTL_MS } from '../utils/attachment-token.js';
 
 const router = Router();
 
 const DATA_BASE = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 
+/**
+ * Accept either the normal JWT bearer token or a signed URL (?exp=&sig=).
+ * Signed URLs are minted by the message renderer for inline images too large
+ * to embed as data: URIs; the sandboxed message iframe cannot send headers.
+ */
+function authenticateAttachmentRequest(req, res, next) {
+  const { exp, sig } = req.query;
+  if (exp !== undefined || sig !== undefined) {
+    if (verifyAttachmentSignature(req.params.attachId, exp, sig)) {
+      req.signedAccess = true;
+      return next();
+    }
+    return res.status(401).json({ error: 'Invalid or expired attachment link' });
+  }
+  return authenticateToken(req, res, next);
+}
+
 // GET /attachments/:attachId — download attachment
-router.get('/attachments/:attachId', authenticateToken, async (req, res) => {
+router.get('/attachments/:attachId', authenticateAttachmentRequest, async (req, res) => {
   try {
     const { attachId } = req.params;
 
@@ -31,8 +49,9 @@ router.get('/attachments/:attachId', authenticateToken, async (req, res) => {
 
     const attachment = result.rows[0];
 
-    // Verify ownership: user must own the account (or be admin)
-    if (req.user.role !== 'admin' && attachment.user_id !== req.user.id) {
+    // Verify ownership: user must own the account (or be admin). A valid
+    // signed URL was minted for an already-authorized viewer, so it stands in.
+    if (!req.signedAccess && req.user.role !== 'admin' && attachment.user_id !== req.user.id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
@@ -64,6 +83,11 @@ router.get('/attachments/:attachId', authenticateToken, async (req, res) => {
     }
 
     res.set('Content-Length', attachment.size_bytes);
+    if (req.signedAccess) {
+      // Let the browser reuse the image for the life of the link; the global
+      // /api no-store would otherwise refetch multi-MB images on every render.
+      res.set('Cache-Control', `private, max-age=${Math.floor(SIGNED_ATTACHMENT_TTL_MS / 1000)}`);
+    }
 
     const stream = createReadStream(resolvedPath);
     stream.on('error', () => {

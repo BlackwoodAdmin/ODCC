@@ -7,6 +7,7 @@ import sgMail from '@sendgrid/mail';
 import { query } from '../db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { emailLog } from '../utils/email-log.js';
+import { signedAttachmentUrl } from '../utils/attachment-token.js';
 
 const DATA_BASE = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const TMP_DIR = path.join(DATA_BASE, 'tmp');
@@ -17,6 +18,9 @@ const ATTACHMENTS_BASE = path.join(DATA_BASE, 'attachments');
 // dashboard iframe ever ran with allow-scripts.
 const INLINE_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
 
+// Inline images up to these caps are embedded as data: URIs. Anything larger
+// (or anything past the aggregate cap) is referenced by a short-lived signed
+// URL instead of being dropped, so oversized phone photos still render.
 const PER_IMAGE_RAW_CAP = Math.floor(1.5 * 1024 * 1024); // ~2 MB encoded
 const AGGREGATE_RAW_CAP = 6 * 1024 * 1024;               // ~8 MB encoded
 
@@ -172,45 +176,51 @@ async function buildInlineImageMaps(attachments, messageId) {
           : path.resolve(DATA_BASE, att.storage_path);
         if (!resolved.startsWith(path.resolve(DATA_BASE) + path.sep)) return null;
         const stat = await fs.stat(resolved);
-        if (stat.size > PER_IMAGE_RAW_CAP) return null;
+        // Too big to embed: reference it by signed URL instead (file confirmed present).
+        if (stat.size > PER_IMAGE_RAW_CAP) return { att, buf: null };
         const buf = await fs.readFile(resolved);
         return { att, buf };
       } catch {
+        // Missing or unreadable on disk: leave the cid: unresolved so the
+        // attachment stays listed and the gap is visible rather than silent.
         return null;
       }
     })
   );
 
   let totalRaw = 0;
-  let included = 0;
-  let dropped = 0;
+  let embedded = 0;
+  let linked = 0;
   for (const r of reads) {
     if (!r) continue;
-    if (totalRaw + r.buf.length > AGGREGATE_RAW_CAP) {
-      dropped += 1;
-      continue;
+    let src;
+    if (r.buf && totalRaw + r.buf.length <= AGGREGATE_RAW_CAP) {
+      totalRaw += r.buf.length;
+      embedded += 1;
+      src = `data:${r.att.content_type};base64,${r.buf.toString('base64')}`;
+    } else {
+      linked += 1;
+      src = signedAttachmentUrl(r.att.id);
     }
-    totalRaw += r.buf.length;
-    included += 1;
-    const dataUri = `data:${r.att.content_type};base64,${r.buf.toString('base64')}`;
-    cidMap.set(String(r.att.content_id).toLowerCase(), dataUri);
+    cidMap.set(String(r.att.content_id).toLowerCase(), src);
     // storage_path is "attachments/<uuid>/<basename>"; the legacy in-HTML
     // form written by older inbound versions is "/data/attachments/<uuid>/<basename>".
     const inHtmlPath = '/data/' + String(r.att.storage_path).replace(/^\/+/, '');
-    pathMap.set(inHtmlPath, dataUri);
+    pathMap.set(inHtmlPath, src);
   }
 
-  if (dropped > 0) {
+  if (linked > 0) {
     try {
-      await emailLog('warn', 'render', 'Inline image aggregate cap reached, images dropped', {
+      await emailLog('info', 'render', 'Inline images over embed cap served by signed URL', {
         message_id: messageId,
-        dropped,
-        included,
-        total_raw_bytes: totalRaw,
-        cap_bytes: AGGREGATE_RAW_CAP,
+        linked,
+        embedded,
+        embedded_raw_bytes: totalRaw,
+        per_image_cap_bytes: PER_IMAGE_RAW_CAP,
+        aggregate_cap_bytes: AGGREGATE_RAW_CAP,
       });
     } catch (logErr) {
-      console.error('[render] aggregate-cap log failed:', logErr.message);
+      console.error('[render] linked-images log failed:', logErr.message);
     }
   }
 
@@ -808,12 +818,15 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
     // contains the cid: token, so the filter needs the original to decide
     // which attachments are actually inline-referenced vs. orphan.
     const originalBodyHtmlLc = (message.body_html || '').toLowerCase();
+    let unresolvedCids = [];
 
-    // Resolve inline images (cid: + legacy /data/attachments/...) to data URIs.
+    // Resolve inline images (cid: + legacy /data/attachments/...) to data URIs
+    // or, when too large to embed, to short-lived signed attachment URLs.
     if (message.body_html) {
       const { cidMap, pathMap } = await buildInlineImageMaps(allAttachments, msgId);
-      const { html, unresolvedCids } = rewriteInlineImages(message.body_html, cidMap, pathMap);
-      message.body_html = html;
+      const rewritten = rewriteInlineImages(message.body_html, cidMap, pathMap);
+      message.body_html = rewritten.html;
+      unresolvedCids = rewritten.unresolvedCids;
 
       try {
         if (unresolvedCids.length) {
@@ -847,16 +860,21 @@ router.get('/accounts/:id/messages/:msgId', async (req, res) => {
     }
 
     // Hide inline images from the user-visible attachment list ONLY when
-    // they are actually referenced in the body via cid:. Gmail (and other
-    // MTAs) set Content-ID on every image attachment, including ones the
-    // sender attached without inlining — those are orphans and must remain
-    // visible as downloadable attachments.
+    // they are actually referenced in the body via cid: AND that reference
+    // was resolved (embedded or linked). Gmail (and other MTAs) set Content-ID
+    // on every image attachment, including ones the sender attached without
+    // inlining — those are orphans and must remain visible as downloadable
+    // attachments. An image whose cid: could not be resolved (file missing)
+    // must stay listed too, otherwise it silently disappears from the UI.
+    const unresolvedSet = new Set(unresolvedCids);
     const visibleAttachments = allAttachments
-      .filter((a) => !(
-        a.content_id
-        && INLINE_IMAGE_TYPES.has(a.content_type)
-        && originalBodyHtmlLc.includes(`cid:${String(a.content_id).toLowerCase()}`)
-      ))
+      .filter((a) => {
+        const cid = a.content_id ? String(a.content_id).toLowerCase() : null;
+        const inlineReferenced = cid
+          && INLINE_IMAGE_TYPES.has(a.content_type)
+          && originalBodyHtmlLc.includes(`cid:${cid}`);
+        return !(inlineReferenced && !unresolvedSet.has(cid));
+      })
       .map(({ storage_path, ...rest }) => ({
         ...rest,
         size: rest.size_bytes,
