@@ -32,8 +32,16 @@ function stripCid(raw) {
 }
 
 // ---------------------------------------------------------------------------
-// Multer config — disk storage, 25 MB limit
+// Multer config — disk storage, 25 MB per file, 30 MB per text field
+//
+// SendGrid Inbound Parse is configured to POST the raw, full MIME message as a
+// single text field (`email`). Attachments arrive base64-encoded inside that
+// field, so it routinely exceeds multer's default 1 MB fieldSize. SendGrid caps
+// inbound messages at 30 MB, so that is the ceiling here.
 // ---------------------------------------------------------------------------
+const MAX_FILE_BYTES = 25 * 1024 * 1024;
+const MAX_FIELD_BYTES = 30 * 1024 * 1024;
+
 const storage = multer.diskStorage({
   destination: async (_req, _file, cb) => {
     try {
@@ -51,15 +59,47 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+  limits: { fileSize: MAX_FILE_BYTES, fieldSize: MAX_FIELD_BYTES },
 });
+
+/**
+ * Run multer and turn any parse failure into a logged, explicit response.
+ * Without this, a multer error falls through to Express's default handler:
+ * a bare 500 with nothing in email_system_logs, which is how oversized
+ * inbound mail was silently lost before.
+ *
+ * Limit errors (LIMIT_*) will never succeed on retry, so acknowledge them with
+ * 200 to stop SendGrid retrying for three days. Anything else returns 500 so
+ * SendGrid does retry.
+ */
+function parseInboundMultipart(req, res, next) {
+  upload.any()(req, res, async (err) => {
+    if (!err) return next();
+
+    const isLimit = err instanceof multer.MulterError && String(err.code).startsWith('LIMIT_');
+    await emailLog('error', 'inbound', 'Inbound webhook failed while parsing multipart body', {
+      error: err.message,
+      code: err.code || null,
+      field: err.field || null,
+      content_length: req.headers['content-length'] || null,
+      retryable: !isLimit,
+    });
+
+    for (const f of req.files || []) {
+      try { await fs.unlink(f.path); } catch { /* already gone */ }
+    }
+
+    if (isLimit) return res.status(200).json({ ok: true, dropped: true });
+    return res.status(500).json({ error: 'Failed to parse inbound message' });
+  });
+}
 
 const router = Router();
 
 // ---------------------------------------------------------------------------
 // POST /api/email/inbound/:token
 // ---------------------------------------------------------------------------
-router.post('/inbound/:token', upload.any(), async (req, res) => {
+router.post('/inbound/:token', parseInboundMultipart, async (req, res) => {
   const tempFiles = [];
   try {
     // ------------------------------------------------------------------

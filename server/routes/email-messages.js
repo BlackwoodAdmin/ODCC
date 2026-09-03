@@ -40,7 +40,9 @@ const composeStorage = multer.diskStorage({
 });
 const composeUpload = multer({
   storage: composeStorage,
-  limits: { fileSize: 25 * 1024 * 1024 },
+  // fieldSize raised from multer's 1 MB default so a large HTML body (e.g. pasted
+  // inline images) sent alongside attachments does not fail the whole request.
+  limits: { fileSize: 25 * 1024 * 1024, fieldSize: 30 * 1024 * 1024 },
 });
 
 /**
