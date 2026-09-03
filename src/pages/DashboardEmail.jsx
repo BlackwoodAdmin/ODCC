@@ -1148,7 +1148,8 @@ export default function DashboardEmail() {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
-  const limit = 50;
+  const [limit, setLimit] = useState(50);
+  const listRef = useRef(null);
 
   // Auto-select inbox folder
   useEffect(() => {
@@ -1197,10 +1198,25 @@ export default function DashboardEmail() {
 
   const totalPages = Math.max(1, Math.ceil(total / limit));
 
+  // If the folder shrinks (deletes, moves) below the current page, step back to the last page
+  useEffect(() => {
+    if (!messagesLoading && page > totalPages) setPage(totalPages);
+  }, [messagesLoading, page, totalPages]);
+
+  // Scroll the list back to the top when the page changes
+  useEffect(() => {
+    if (listRef.current) listRef.current.scrollTop = 0;
+  }, [page]);
+
+  const changePageSize = (size) => {
+    setLimit(size);
+    setPage(1);
+  };
+
   // Clear selections on list change
   useEffect(() => {
     setSelectedIds(new Set());
-  }, [selectedFolderId, page, searchQuery]);
+  }, [selectedFolderId, page, limit, searchQuery]);
 
   const toggleSelect = (id) => {
     setSelectedIds(prev => {
@@ -1488,7 +1504,7 @@ export default function DashboardEmail() {
                 )}
 
                 {/* Message list */}
-                <div className="flex-1 overflow-auto">
+                <div ref={listRef} className="flex-1 overflow-auto">
                   {messagesLoading ? (
                     <Spinner />
                   ) : messages.length === 0 ? (
@@ -1588,11 +1604,26 @@ export default function DashboardEmail() {
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && (
+                {total > 0 && (
                   <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between text-sm">
-                    <span className="text-gray-500">
-                      {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total}
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-gray-500">
+                        {((page - 1) * limit) + 1}-{Math.min(page * limit, total)} of {total}
+                      </span>
+                      <label className="flex items-center gap-1 text-gray-500">
+                        <span className="hidden sm:inline">Per page</span>
+                        <select
+                          value={limit}
+                          onChange={e => changePageSize(parseInt(e.target.value, 10))}
+                          className="border border-gray-200 rounded-lg px-2 py-1 text-sm text-charcoal bg-white"
+                          aria-label="Messages per page"
+                        >
+                          <option value={25}>25</option>
+                          <option value={50}>50</option>
+                          <option value={100}>100</option>
+                        </select>
+                      </label>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setPage(p => Math.max(1, p - 1))}

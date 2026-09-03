@@ -70,7 +70,7 @@ export function useMessages(accountId, { folderId, page = 1, limit = 50, search,
       if (threaded) params.set('threaded', 'true');
       const res = await api.get(`/email/accounts/${accountId}/messages?${params}`);
       setMessages(res.messages || []);
-      setTotal(res.total || 0);
+      setTotal(res.pagination?.total ?? res.total ?? 0);
     } catch { setMessages([]); setTotal(0); }
     finally { setLoading(false); }
   }, [accountId, folderId, page, limit, search, threaded]);

@@ -360,7 +360,7 @@ function AuditLogTab({ accounts }) {
       if (dateTo) params.to = dateTo;
       const res = await emailApi.getAuditLog(accountId, params);
       setLogs(res.entries || res.logs || []);
-      setTotal(res.total || 0);
+      setTotal(res.pagination?.total ?? res.total ?? 0);
     } catch (err) {
       notify(err.message || 'Failed to load audit log', 'error');
       setLogs([]);
