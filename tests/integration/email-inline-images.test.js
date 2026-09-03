@@ -16,10 +16,13 @@ const { default: emailMessageRoutes } = await import('../../server/routes/email-
 const { default: emailAttachmentRoutes } = await import('../../server/routes/email-attachments.js');
 const { signedAttachmentUrl } = await import('../../server/utils/attachment-token.js');
 
+// Mount in the same order as server/index.js: the messages router comes
+// first. Its router-wide auth guard must not swallow signed attachment
+// requests that belong to the router mounted after it.
 const app = buildTestApp({
   routes: {
-    '/api/email': { router: emailAttachmentRoutes },
-    '/api/email/': { router: emailMessageRoutes },
+    '/api/email': { router: emailMessageRoutes },
+    '/api/email/': { router: emailAttachmentRoutes },
   },
 });
 

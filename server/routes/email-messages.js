@@ -622,7 +622,11 @@ function estimateMessageSize(body_html, body_text, subject) {
 }
 
 // ── All routes require JWT auth ──────────────────────────────────────────────
-router.use(authenticateToken);
+// Scoped to /accounts (every route in this file) rather than router-wide:
+// several routers share the /api/email mount, and the attachments router,
+// mounted after this one, accepts signed URLs without a bearer token. A
+// router-wide guard here would reject those before they reach it.
+router.use('/accounts', authenticateToken);
 
 // ── GET /accounts/:id/messages ───────────────────────────────────────────────
 // List messages. Query params: folderId, page, limit, search
