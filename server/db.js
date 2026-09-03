@@ -281,6 +281,27 @@ export async function initializeDatabase() {
       processed_at BIGINT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS chili_cookoff_entries (
+      id SERIAL PRIMARY KEY,
+      cook_first_name VARCHAR(100) NOT NULL,
+      age SMALLINT NOT NULL CHECK (age BETWEEN 7 AND 19),
+      division VARCHAR(10) NOT NULL CHECK (division IN ('junior', 'teen')),
+      chili_name VARCHAR(150) NOT NULL,
+      parent_name VARCHAR(150) NOT NULL,
+      parent_email VARCHAR(255) NOT NULL,
+      parent_phone VARCHAR(20),
+      notes TEXT,
+      source VARCHAR(10) NOT NULL DEFAULT 'online' CHECK (source IN ('online', 'walkin')),
+      entry_number INTEGER,
+      checked_in_at BIGINT,
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS site_settings (
+      key VARCHAR(100) PRIMARY KEY,
+      value JSONB NOT NULL,
+      updated_at BIGINT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS bulletin_notes (
       id SERIAL PRIMARY KEY,
       week_start DATE NOT NULL UNIQUE,
@@ -327,6 +348,7 @@ export async function initializeDatabase() {
     `CREATE UNIQUE INDEX idx_email_messages_account_message_id ON email_messages(account_id, message_id) WHERE message_id IS NOT NULL`,
     `CREATE UNIQUE INDEX idx_email_accounts_catch_all ON email_accounts((TRUE)) WHERE is_catch_all = TRUE`,
     `CREATE INDEX idx_email_messages_search ON email_messages USING gin(to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(body_text,'')))`,
+    `CREATE UNIQUE INDEX idx_chili_cookoff_entry_unique ON chili_cookoff_entries (lower(parent_email), lower(cook_first_name))`,
   ];
   for (const sql of conditionalIndexes) {
     try { await pool.query(sql); } catch (e) {

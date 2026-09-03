@@ -45,7 +45,7 @@ export const api = {
   get: (url) => request(url),
   post: (url, body) => request(url, { method: 'POST', body: body instanceof FormData ? body : JSON.stringify(body) }),
   put: (url, body) => request(url, { method: 'PUT', body: body instanceof FormData ? body : JSON.stringify(body) }),
-  delete: (url) => request(url, { method: 'DELETE' }),
+  delete: (url, body) => request(url, { method: 'DELETE', ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
   downloadBlob,
 };
 

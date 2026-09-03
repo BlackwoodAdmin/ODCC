@@ -20,6 +20,7 @@ export default function Dashboard() {
     bulletinCard,
     { to: '/dashboard/comments', label: 'Comments', count: stats?.comments?.total || 0, icon: '💬', color: 'bg-purple-50 text-purple-600' },
     { to: '/dashboard/messages', label: 'Messages', count: stats?.messages?.total || 0, unread: Number(stats?.messages?.unread) || 0, icon: '✉️', color: 'bg-orange-50 text-orange-600' },
+    { to: '/dashboard/chili-cookoff', label: 'Chili Cook-Off', count: Number(stats?.chili?.total) || 0, icon: '🌶️', color: 'bg-red-50 text-red-600' },
     { to: '/dashboard/users', label: 'Users', count: stats?.users?.total || 0, icon: '👥', color: 'bg-pink-50 text-pink-600' },
     { to: '/dashboard/newsletter', label: 'Newsletter', count: null, icon: '📰', color: 'bg-amber-50 text-amber-600' },
     { to: '/dashboard/email', label: 'Email', count: null, icon: '📧', color: 'bg-teal-50 text-teal-600' },

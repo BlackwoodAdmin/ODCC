@@ -11,6 +11,7 @@ import postRoutes from './routes/posts.js';
 import eventRoutes from './routes/events.js';
 import commentRoutes from './routes/comments.js';
 import contactRoutes from './routes/contact.js';
+import chiliCookoffRoutes from './routes/chili-cookoff.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
 import newsletterRoutes, { checkStuckCampaigns } from './routes/newsletter.js';
@@ -96,6 +97,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/comments', commentRoutes);
 app.use('/api/bulletin-notes', bulletinNoteRoutes);
 app.use('/api/contact', requireOriginCheck, contactRoutes);
+app.use('/api/chili-cookoff', requireOriginCheck, chiliCookoffRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/newsletter', newsletterRoutes);
@@ -269,6 +271,12 @@ const STATIC_OG_PAGES = [
     path: '/joy-ladies-circle',
     title: 'J.O.Y. Ladies Circle - Open Door Christian Church',
     description: 'Jesus · Others · Yourself. All women are welcome at the J.O.Y. Ladies Circle of Open Door Christian Church in DeLand, Florida.',
+  },
+  {
+    path: '/chili-cookoff',
+    title: 'Jr Chili Cook-Off Sign-Up - Fall Festival 2026 - Open Door Christian Church',
+    description: 'Register your junior chef (ages 7-19) for the Jr Chili Cook-Off at our Free Family Fall Festival, Saturday, October 17, 2026, 9 AM - 3 PM in DeLand, Florida. Pre-register by October 12.',
+    image: `${SITE_URL}/fall-festival-2026.jpg`,
   },
   {
     path: '/our-pastor',

@@ -1,3 +1,4 @@
+import { todayET } from '../../utils/formatters';
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, NavLink, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
@@ -15,10 +16,13 @@ export default function Header() {
   const aboutMobileRef = useRef(null);
   const aboutTimeout = useRef(null);
 
+  // Fall Festival 2026 link shows through festival day (Oct 17), then drops off by itself.
+  const festivalActive = todayET() <= '2026-10-17';
   const navLinks = [
     { to: '/', label: 'Home' },
     { to: '/services', label: 'Services' },
     { to: '/events', label: 'Events' },
+    ...(festivalActive ? [{ to: '/chili-cookoff', label: 'Fall Festival' }] : []),
     { to: '/give', label: 'Give' },
   ];
 

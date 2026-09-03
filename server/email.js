@@ -208,3 +208,88 @@ export async function sendWelcomeEmail(to, name) {
   `;
   return sendEmail({ to, subject: 'Welcome to Open Door Christian Church!', html });
 }
+// ── Jr Chili Cook-Off (Fall Festival 2026) ───────────────────────────────────
+const CHILI_DIVISION_LABEL = { junior: 'Ages 7–12', teen: 'Ages 13–19' };
+
+function chiliEmailShell(inner) {
+  return `
+    <div style="max-width:600px;margin:0 auto;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+      <div style="background:#B23A2E;padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
+        <h1 style="margin:0;color:#ffffff;font-size:22px;">Jr Chili Cook-Off</h1>
+        <p style="margin:6px 0 0;color:#FFE5A0;font-size:14px;">Free Family Fall Festival · Saturday, October 17, 2026</p>
+      </div>
+      <div style="background:#ffffff;padding:32px;border:1px solid #e5e7eb;border-top:none;">
+        ${inner}
+      </div>
+      <div style="background:#f9fafb;padding:20px 32px;border-radius:0 0 12px 12px;border:1px solid #e5e7eb;border-top:none;text-align:center;">
+        <p style="margin:0 0 6px;color:#6b7280;font-size:13px;font-weight:600;">Open Door Christian Church</p>
+        <p style="margin:0;color:#9ca3af;font-size:12px;">1700 S Clara Ave, DeLand, FL 32720</p>
+      </div>
+    </div>
+  `;
+}
+
+function chiliDetailRows(pairs) {
+  return pairs.map(([k, v]) => `
+    <tr>
+      <td style="padding:6px 12px 6px 0;color:#6b7280;font-size:14px;white-space:nowrap;vertical-align:top;">${escapeHtml(k)}</td>
+      <td style="padding:6px 0;color:#1f2937;font-size:14px;font-weight:600;">${escapeHtml(v)}</td>
+    </tr>`).join('');
+}
+
+/** Confirmation to the parent/guardian after an online registration. */
+export async function sendChiliCookoffConfirmation({ to, parentName, cookName, chiliName, division }) {
+  const safeParent = escapeHtml(parentName) || 'there';
+  const inner = `
+    <h2 style="margin:0 0 12px;color:#1f2937;font-size:20px;">${escapeHtml(cookName)} is registered!</h2>
+    <p style="color:#4b5563;font-size:15px;line-height:1.6;">Hi ${safeParent}, thank you for signing up for the Jr Chili Cook-Off. Here is what we have:</p>
+    <table style="border-collapse:collapse;margin:12px 0 20px;">
+      ${chiliDetailRows([
+        ['Junior cook', cookName],
+        ['Chili name', chiliName],
+        ['Division', CHILI_DIVISION_LABEL[division] || division],
+      ])}
+    </table>
+    <h3 style="margin:0 0 8px;color:#1f2937;font-size:16px;">On festival day</h3>
+    <ul style="margin:0 0 20px;padding-left:20px;color:#4b5563;font-size:15px;line-height:1.7;">
+      <li><strong>Saturday, October 17</strong> · Festival runs 9:00 AM – 3:00 PM</li>
+      <li><strong>Bring your chili by 11:45 AM</strong> to the Jr Chili Cook-Off table</li>
+      <li>Voting begins at <strong>noon</strong> and ends by <strong>2:00 PM</strong>, or while supplies last</li>
+      <li>Open Door Christian Church, 1700 S Clara Ave, DeLand, FL 32720</li>
+    </ul>
+    <p style="color:#4b5563;font-size:15px;line-height:1.6;">Need to change anything? Just reply to this email.</p>
+  `;
+  return sendEmail({
+    to,
+    subject: `You're registered: ${cookName} · Jr Chili Cook-Off, Oct 17`,
+    html: chiliEmailShell(inner),
+  });
+}
+
+/** Heads-up to the church office for each new registration. */
+export async function sendChiliCookoffNotification({ to, entry }) {
+  const inner = `
+    <h2 style="margin:0 0 12px;color:#1f2937;font-size:20px;">New Jr Chili Cook-Off registration</h2>
+    <table style="border-collapse:collapse;margin:12px 0 20px;">
+      ${chiliDetailRows([
+        ['Junior cook', entry.cook_first_name],
+        ['Age', String(entry.age)],
+        ['Division', CHILI_DIVISION_LABEL[entry.division] || entry.division],
+        ['Chili name', entry.chili_name],
+        ['Parent/guardian', entry.parent_name],
+        ['Email', entry.parent_email],
+        ['Phone', entry.parent_phone || '—'],
+        ['Notes', entry.notes || '—'],
+      ])}
+    </table>
+    <p style="color:#4b5563;font-size:14px;line-height:1.6;">
+      Manage all entries in the dashboard:
+      <a href="${SITE_URL}/dashboard/chili-cookoff" style="color:#5BA346;">${SITE_URL}/dashboard/chili-cookoff</a>
+    </p>
+  `;
+  return sendEmail({
+    to,
+    subject: `Chili Cook-Off entry: ${entry.cook_first_name} (${entry.age}) — "${entry.chili_name}"`,
+    html: chiliEmailShell(inner),
+  });
+}

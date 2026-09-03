@@ -1,3 +1,4 @@
+import { todayET } from '../utils/formatters';
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useFetch from '../hooks/useFetch';
@@ -30,6 +31,18 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Fall Festival 2026 announcement — drops off by itself after festival day */}
+      {todayET() <= '2026-10-17' && (
+        <section className="bg-earth text-white py-4">
+          <div className="container-custom flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-6 text-center text-sm md:text-base">
+            <span>🍂 <span className="font-bold">Free Family Fall Festival</span> · Saturday, Oct 17 · 9 AM – 3 PM · Celebrating 40 years!</span>
+            <Link to="/chili-cookoff" className="inline-block bg-cream text-earth font-semibold px-4 py-1.5 rounded-full hover:bg-cream-300 transition-colors whitespace-nowrap">
+              Jr Chili Cook-Off sign-up →
+            </Link>
+          </div>
+        </section>
+      )}
 
       {/* Service Times Quick View */}
       <section className="bg-sage text-white py-6">
