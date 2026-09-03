@@ -37,6 +37,7 @@ import DashboardAdminDonations from './pages/DashboardAdminDonations';
 import DashboardBulletin from './pages/DashboardBulletin';
 import DashboardBulletinEditor from './pages/DashboardBulletinEditor';
 import Unsubscribe from './pages/Unsubscribe';
+import NotFound from './pages/NotFound';
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -86,6 +87,9 @@ export default function App() {
               <Route path="/dashboard/admin/donations" element={<ProtectedRoute roles={['admin']}><DashboardAdminDonations /></ProtectedRoute>} />
               <Route path="/dashboard/admin/email" element={<ProtectedRoute roles={['admin']}><DashboardAdminEmail /></ProtectedRoute>} />
               <Route path="/dashboard/admin/email/monitoring" element={<ProtectedRoute roles={['admin']}><DashboardAdminEmailMonitoring /></ProtectedRoute>} />
+              {/* Catch-all: unknown URLs render the Not Found page inside the normal layout.
+                  The server answers these with a 404 status (see server/spa-routes.js). */}
+              <Route path="*" element={<NotFound />} />
             </Route>
           </Routes>
         </NotificationProvider>

@@ -33,6 +33,7 @@ import directoryRoutes from './routes/directory.js';
 import bulletinNoteRoutes from './routes/bulletin-notes.js';
 import { initDonationCrons } from './cron/donation-cleanup.js';
 import { requireOriginCheck } from './middleware/origin-check.js';
+import { isKnownSpaPath, ASSET_PATH_RE } from './spa-routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -120,6 +121,11 @@ app.use('/api/email', emailAdminLogRoutes);
 // Donation routes (origin check on public create-payment-intent; webhook excluded — has Stripe sig)
 app.use('/api/donations', requireOriginCheck, donationRoutes);
 
+// Anything under /api that no router handled: JSON 404, never the SPA shell.
+app.all('/api/*', (_req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
 // Serve public/ for AI-generated images and other static assets
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d' }));
 const distPath = path.join(__dirname, '..', 'dist');
@@ -153,7 +159,7 @@ app.get('/blog/:slug', async (req, res) => {
     res.set('Cache-Control', 'no-cache');
 
     if (result.rows.length === 0) {
-      return res.type('html').send(indexHtml);
+      return res.status(404).type('html').send(renderNotFoundHtml(`/blog/${slug}`));
     }
 
     const post = result.rows[0];
@@ -236,6 +242,19 @@ function renderWithOg({ title, description, image = DEFAULT_OG_IMAGE, type = 'we
   return html.replace('</head>', ogTags + '\n</head>');
 }
 
+/**
+ * App shell for an unknown URL. Carries a "Page Not Found" title, noindex,
+ * and neutral OG tags; the React router renders the friendly Not Found page.
+ */
+function renderNotFoundHtml(urlPath) {
+  const html = renderWithOg({
+    title: 'Page Not Found - Open Door Christian Church',
+    description: "We couldn't find that page. Visit Open Door Christian Church in DeLand, Florida for service times, events, and more.",
+    urlPath,
+  });
+  return html.replace('</head>', '  <meta name="robots" content="noindex" />\n</head>');
+}
+
 const STATIC_OG_PAGES = [
   {
     path: '/about',
@@ -300,10 +319,22 @@ for (const page of STATIC_OG_PAGES) {
   });
 }
 
-// Catch-all route for SPA
+// File-looking requests that no static handler served (missing bundle,
+// image, font, robots.txt …): plain 404. Serving the app shell here would
+// hand browsers HTML where they expect a script or image.
+app.get(ASSET_PATH_RE, (_req, res) => {
+  res.status(404).type('text').send('Not found');
+});
+
+// SPA catch-all. Known client routes get the shell with 200. Anything else
+// gets the shell with a real 404 status so browsers, crawlers, and link
+// checkers see Not Found while React renders the friendly page.
 app.get('*', (req, res) => {
   res.set('Cache-Control', 'no-cache');
-  res.sendFile(path.join(distPath, 'index.html'));
+  if (isKnownSpaPath(req.path)) {
+    return res.sendFile(path.join(distPath, 'index.html'));
+  }
+  res.status(404).type('html').send(renderNotFoundHtml(req.path));
 });
 
 // Helper function to escape HTML special characters
