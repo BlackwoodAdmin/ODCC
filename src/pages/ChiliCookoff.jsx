@@ -119,6 +119,7 @@ export default function ChiliCookoff() {
                   <ul className="list-disc pl-5 text-gray-600 space-y-1 mb-8">
                     <li>Bring your chili to the Jr Chili Cook-Off table by <strong>11:45 AM</strong>.</li>
                     <li>Voting begins at <strong>noon</strong> and ends by <strong>2:00 PM</strong>, or while supplies last.</li>
+                    <li>Awards ceremony at <strong>2:30 PM</strong>.</li>
                     <li>1700 South Clara Ave, DeLand, FL 32720.</li>
                   </ul>
                   <div className="flex flex-wrap gap-3">
@@ -219,6 +220,7 @@ export default function ChiliCookoff() {
               <DetailCard icon="⏰" title="On the day">
                 <p>Bring your chili by <strong>11:45 AM</strong>.</p>
                 <p>Voting begins at noon and ends by 2:00 PM, or while supplies last.</p>
+                <p>Awards ceremony at <strong>2:30 PM</strong>.</p>
               </DetailCard>
               <DetailCard icon="🗓️" title="Deadline">
                 <p>Pre-register by <strong>October 12</strong>.</p>

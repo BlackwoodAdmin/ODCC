@@ -26,6 +26,7 @@ describe('Fall Festival pages', () => {
     expect(html).toContain('Jr Chili Cook-Off');
     expect(html).toContain('Saturday, October 17, 2026');
     expect(html).toContain('/fall-festival-2026.webp');
+    expect(html).toContain('Awards ceremony at <strong>2:30 PM</strong>');
   });
 
   it('admin roster page renders', () => {

@@ -255,6 +255,7 @@ export async function sendChiliCookoffConfirmation({ to, parentName, cookName, c
       <li><strong>Saturday, October 17</strong> · Festival runs 9:00 AM – 3:00 PM</li>
       <li><strong>Bring your chili by 11:45 AM</strong> to the Jr Chili Cook-Off table</li>
       <li>Voting begins at <strong>noon</strong> and ends by <strong>2:00 PM</strong>, or while supplies last</li>
+      <li>Awards ceremony at <strong>2:30 PM</strong></li>
       <li>Open Door Christian Church, 1700 S Clara Ave, DeLand, FL 32720</li>
     </ul>
     <p style="color:#4b5563;font-size:15px;line-height:1.6;">Need to change anything? Just reply to this email.</p>
