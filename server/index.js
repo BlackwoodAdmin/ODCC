@@ -12,6 +12,7 @@ import eventRoutes from './routes/events.js';
 import commentRoutes from './routes/comments.js';
 import contactRoutes from './routes/contact.js';
 import chiliCookoffRoutes from './routes/chili-cookoff.js';
+import sitemapRoutes from './routes/sitemap.js';
 import userRoutes from './routes/users.js';
 import dashboardRoutes from './routes/dashboard.js';
 import newsletterRoutes, { checkStuckCampaigns } from './routes/newsletter.js';
@@ -125,6 +126,10 @@ app.use('/api/donations', requireOriginCheck, donationRoutes);
 app.all('/api/*', (_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
+
+// /sitemap.xml (dynamic: public pages + published posts). robots.txt is a
+// static file in public/. Both must sit ahead of the file-404 handler below.
+app.use(sitemapRoutes);
 
 // Serve public/ for AI-generated images and other static assets
 app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d' }));

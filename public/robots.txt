@@ -1,0 +1,12 @@
+# Open Door Christian Church — https://opendoorchristian.church
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /login
+Disallow: /register
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /unsubscribe
+
+Sitemap: https://opendoorchristian.church/sitemap.xml
