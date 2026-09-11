@@ -1365,7 +1365,7 @@ export default function DashboardEmail() {
                   {folders.map(folder => (
                     <button
                       key={folder.id}
-                      onClick={() => { setSelectedFolderId(folder.id); setPage(1); setViewingMessageId(null); setViewingThreadId(null); refetchMessages(); refetchFolders(); }}
+                      onClick={() => { setSelectedFolderId(folder.id); setPage(1); setViewingMessageId(null); setViewingThreadId(null); refetchFolders(); }}
                       className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                         selectedFolderId === folder.id
                           ? 'bg-sage/10 text-sage font-medium'

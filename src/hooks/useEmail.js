@@ -57,9 +57,13 @@ export function useMessages(accountId, { folderId, page = 1, limit = 50, search,
   const [messages, setMessages] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  // Monotonic request counter: only the most recent request may update state, so a slow
+  // response for a previous folder/page/search can't overwrite a newer one.
+  const requestSeq = useRef(0);
 
   const fetch = useCallback(async () => {
     if (!accountId) return;
+    const seq = ++requestSeq.current;
     setLoading(true);
     try {
       const params = new URLSearchParams();
@@ -69,10 +73,14 @@ export function useMessages(accountId, { folderId, page = 1, limit = 50, search,
       if (search) params.set('search', search);
       if (threaded) params.set('threaded', 'true');
       const res = await api.get(`/email/accounts/${accountId}/messages?${params}`);
+      if (seq !== requestSeq.current) return;
       setMessages(res.messages || []);
       setTotal(res.pagination?.total ?? res.total ?? 0);
-    } catch { setMessages([]); setTotal(0); }
-    finally { setLoading(false); }
+    } catch {
+      if (seq !== requestSeq.current) return;
+      setMessages([]); setTotal(0);
+    }
+    finally { if (seq === requestSeq.current) setLoading(false); }
   }, [accountId, folderId, page, limit, search, threaded]);
 
   useEffect(() => { fetch(); }, [fetch]);
