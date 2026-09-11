@@ -10,6 +10,7 @@ const ONE_HOUR = 60 * 60 * 1000;
 const ONE_DAY = 24 * ONE_HOUR;
 const FOURTEEN_DAYS = 14 * ONE_DAY;
 const THIRTY_DAYS = 30 * ONE_DAY;
+const SIXTY_DAYS = 60 * ONE_DAY;
 const ONE_YEAR = 365 * ONE_DAY;
 
 /**
@@ -71,19 +72,23 @@ async function startupRecovery() {
 }
 
 /**
- * 2. Trash purge: delete messages in trash folders older than 30 days.
+ * 2. Trash purge: permanently delete messages that have sat in a Trash folder
+ *    for 60 days or more. This is the ONLY job that deletes messages, and it
+ *    only ever touches folders of type 'trash' -- never the Inbox or any other
+ *    folder. updated_at is set when a message is moved to Trash, so the 60-day
+ *    clock starts at trashing time, not at receipt.
  */
 async function trashPurge() {
   try {
-    const cutoff = Date.now() - THIRTY_DAYS;
+    const cutoff = Date.now() - SIXTY_DAYS;
     const result = await query(
       `DELETE FROM email_messages
        WHERE folder_id IN (SELECT id FROM email_folders WHERE type = 'trash')
-         AND updated_at < $1`,
+         AND updated_at <= $1`,
       [cutoff]
     );
     const count = result.rowCount;
-    await emailLog('info', 'cron', `Trash purge: deleted ${count} message(s)`);
+    await emailLog('info', 'cron', `Trash purge: deleted ${count} message(s) trashed 60+ days ago`);
   } catch (err) {
     await emailLog('error', 'cron', `Trash purge failed: ${err.message}`);
   }

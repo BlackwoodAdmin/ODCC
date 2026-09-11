@@ -195,7 +195,7 @@ export async function initializeDatabase() {
       account_id INTEGER NOT NULL REFERENCES email_accounts(id),
       user_id INTEGER REFERENCES users(id),
       action VARCHAR(50) NOT NULL,
-      message_id INTEGER REFERENCES email_messages(id),
+      message_id INTEGER REFERENCES email_messages(id) ON DELETE SET NULL,
       details JSONB,
       ip_address VARCHAR(45),
       created_at BIGINT NOT NULL
@@ -389,6 +389,23 @@ export async function initializeDatabase() {
   // Allow NULL password_hash for newsletter-only subscribers
   try { await pool.query('ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL'); } catch (e) {
     // Ignore if already nullable
+  }
+
+  // Audit log rows must not block hard-deleting a message (trash purge, permanent delete).
+  // Detach the reference instead so the audit trail survives with message_id = NULL.
+  try {
+    const fk = await pool.query(
+      `SELECT confdeltype FROM pg_constraint WHERE conname = 'email_audit_log_message_id_fkey'`
+    );
+    if (fk.rows.length === 0 || fk.rows[0].confdeltype !== 'n') {
+      await pool.query(`ALTER TABLE email_audit_log
+        DROP CONSTRAINT IF EXISTS email_audit_log_message_id_fkey,
+        ADD CONSTRAINT email_audit_log_message_id_fkey
+          FOREIGN KEY (message_id) REFERENCES email_messages(id) ON DELETE SET NULL`);
+      console.log('Migrated email_audit_log.message_id FK to ON DELETE SET NULL');
+    }
+  } catch (e) {
+    console.error('Migration (email_audit_log message_id ON DELETE SET NULL) failed:', e.message);
   }
 
   console.log('Database initialized');
