@@ -191,7 +191,7 @@ export default function DashboardPosts() {
               <div>
                 <label className="block text-sm font-medium text-charcoal mb-2">Content *</label>
                 <Suspense fallback={<div className="border border-gray-200 rounded-lg p-8 text-center text-gray-500">Loading editor...</div>}>
-                  <RichTextEditor value={form.content} onChange={handleContentChange} />
+                  <RichTextEditor value={form.content} onChange={handleContentChange} alignment fontSize />
                 </Suspense>
               </div>
               <div className="grid grid-cols-2 gap-4">
