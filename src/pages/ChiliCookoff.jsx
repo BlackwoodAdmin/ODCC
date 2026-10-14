@@ -143,7 +143,7 @@ export default function ChiliCookoff() {
                 <>
                   <h2 className="text-3xl font-bold text-charcoal mb-2">Sign up your young chef</h2>
                   <p className="text-gray-600 mb-8">
-                    Open to ages 7–19. Pre-register by <strong>October 12</strong>. Walk-ins are welcome on the day if there is space.
+                    Open to ages 7–19. Sign up online until <strong>11:45 AM on festival day</strong> — walk-ins are also welcome if there is space.
                   </p>
                   <form onSubmit={handleSubmit} className="space-y-8">
                     <fieldset className="space-y-5">
@@ -223,7 +223,7 @@ export default function ChiliCookoff() {
                 <p>Awards ceremony at <strong>2:30 PM</strong>.</p>
               </DetailCard>
               <DetailCard icon="🗓️" title="Deadline">
-                <p>Pre-register by <strong>October 12</strong>.</p>
+                <p>Sign up online until <strong>11:45 AM</strong> on festival day.</p>
                 <p>Walk-ins welcome if there is space.</p>
               </DetailCard>
               <p className="text-sm text-gray-500">

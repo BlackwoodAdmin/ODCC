@@ -14,7 +14,7 @@ const adminOnly = [authenticateToken, requireRole('admin')];
 export const SETTINGS_KEY = 'chili_cookoff';
 export const DEFAULT_SETTINGS = Object.freeze({
   registration_open: true,
-  deadline: '2026-10-12T23:59:59-04:00', // Oct 12, 11:59 PM Eastern (flyer's pre-registration deadline)
+  deadline: '2026-10-17T11:45:00-04:00', // Festival morning, chili drop-off time (extended from the flyer's Oct 12 deadline)
   capacity: null,                         // null = unlimited
 });
 
@@ -22,7 +22,7 @@ const NOTIFY_TO = process.env.CHILI_COOKOFF_NOTIFY_EMAIL || 'hello@opendoorchris
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CLOSED_MESSAGES = {
   closed: 'Online registration is currently closed. Questions? Email hello@opendoorchristian.church.',
-  deadline: 'Pre-registration closed on October 12. Walk-ins are welcome on festival day if there is space — bring your chili by 11:45 AM.',
+  deadline: 'Online sign-up has closed. Walk-ins are welcome on festival day if there is space — bring your chili by 11:45 AM.',
   full: 'Pre-registration is full. Walk-ins are welcome on festival day if there is space — bring your chili by 11:45 AM.',
 };
 

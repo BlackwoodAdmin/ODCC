@@ -299,7 +299,7 @@ const STATIC_OG_PAGES = [
   {
     path: '/chili-cookoff',
     title: 'Jr Chili Cook-Off Sign-Up - Fall Festival 2026 - Open Door Christian Church',
-    description: 'Register your junior chef (ages 7-19) for the Jr Chili Cook-Off at our Free Family Fall Festival, Saturday, October 17, 2026, 9 AM - 3 PM in DeLand, Florida. Pre-register by October 12.',
+    description: 'Register your junior chef (ages 7-19) for the Jr Chili Cook-Off at our Free Family Fall Festival, Saturday, October 17, 2026, 9 AM - 3 PM in DeLand, Florida. Online sign-up open until festival morning.',
     image: `${SITE_URL}/fall-festival-2026.jpg`,
   },
   {
