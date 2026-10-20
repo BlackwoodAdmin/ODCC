@@ -8,3 +8,4 @@ DONATION_ANONYMOUS_FIX_PLAN.md
 PLAN-*.md
 CLAUDE.md
 package-lock.json
+.claude/

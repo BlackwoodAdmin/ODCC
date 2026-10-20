@@ -2,17 +2,10 @@ import React, { useEffect, useState, useCallback, useRef, lazy, Suspense } from 
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import useNotification from '../hooks/useNotification';
-import { formatDateTime } from '../utils/formatters';
+import { formatDateTime, stripHtml } from '../utils/formatters';
 import { addWeeks, formatWeekRange, isSundayIsoDate } from '../utils/week';
 
 const RichTextEditor = lazy(() => import('../components/editors/RichTextEditor'));
-
-function stripHtml(html) {
-  if (!html) return '';
-  const tmp = document.createElement('div');
-  tmp.innerHTML = html.replace(/<\/?[^>]+>/g, ' ');
-  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
-}
 
 export default function DashboardBulletinEditor() {
   const { weekStart } = useParams();
