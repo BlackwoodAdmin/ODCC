@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import React, { useEffect, useRef, lazy, Suspense } from 'react';
+import { Routes, Route, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import MainLayout from './components/layout/MainLayout';
@@ -19,35 +19,51 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
-import Dashboard from './pages/Dashboard';
-import DashboardPosts from './pages/DashboardPosts';
-import DashboardEvents from './pages/DashboardEvents';
-import DashboardUsers from './pages/DashboardUsers';
-import DashboardComments from './pages/DashboardComments';
-import DashboardMessages from './pages/DashboardMessages';
-import DashboardChiliCookoff from './pages/DashboardChiliCookoff';
-import DashboardEmail from './pages/DashboardEmail';
-import DashboardAdminEmail from './pages/DashboardAdminEmail';
-import DashboardAdminEmailMonitoring from './pages/DashboardAdminEmailMonitoring';
-import DashboardNewsletter from './pages/DashboardNewsletter';
-import DashboardDonations from './pages/DashboardDonations';
-import DashboardProfile from './pages/DashboardProfile';
-import DashboardDirectory from './pages/DashboardDirectory';
-import DashboardAdminDonations from './pages/DashboardAdminDonations';
-import DashboardBulletin from './pages/DashboardBulletin';
-import DashboardBulletinEditor from './pages/DashboardBulletinEditor';
 import Unsubscribe from './pages/Unsubscribe';
 import NotFound from './pages/NotFound';
 
+// Dashboard pages are lazy so they (and TipTap/CodeMirror) stay out of the
+// public bundle and out of the SSR module graph — they must never be
+// imported eagerly from anything a public page reaches.
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const DashboardPosts = lazy(() => import('./pages/DashboardPosts'));
+const DashboardEvents = lazy(() => import('./pages/DashboardEvents'));
+const DashboardUsers = lazy(() => import('./pages/DashboardUsers'));
+const DashboardComments = lazy(() => import('./pages/DashboardComments'));
+const DashboardMessages = lazy(() => import('./pages/DashboardMessages'));
+const DashboardChiliCookoff = lazy(() => import('./pages/DashboardChiliCookoff'));
+const DashboardEmail = lazy(() => import('./pages/DashboardEmail'));
+const DashboardAdminEmail = lazy(() => import('./pages/DashboardAdminEmail'));
+const DashboardAdminEmailMonitoring = lazy(() => import('./pages/DashboardAdminEmailMonitoring'));
+const DashboardNewsletter = lazy(() => import('./pages/DashboardNewsletter'));
+const DashboardDonations = lazy(() => import('./pages/DashboardDonations'));
+const DashboardProfile = lazy(() => import('./pages/DashboardProfile'));
+const DashboardDirectory = lazy(() => import('./pages/DashboardDirectory'));
+const DashboardAdminDonations = lazy(() => import('./pages/DashboardAdminDonations'));
+const DashboardBulletin = lazy(() => import('./pages/DashboardBulletin'));
+const DashboardBulletinEditor = lazy(() => import('./pages/DashboardBulletinEditor'));
+
 function ScrollToTop() {
   const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const firstRender = useRef(true);
+  useEffect(() => {
+    // Skip the mount scroll: hydration would otherwise yank a reader who
+    // already scrolled the server-rendered page before JS loaded.
+    if (firstRender.current) { firstRender.current = false; return; }
+    window.scrollTo(0, 0);
+  }, [pathname]);
   return null;
 }
 
+const dashboardFallback = (
+  <div className="text-center py-24">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-sage mx-auto"></div>
+  </div>
+);
+
 export default function App() {
   return (
-    <BrowserRouter>
+    <>
       <ScrollToTop />
       <AuthProvider>
         <NotificationProvider>
@@ -69,24 +85,28 @@ export default function App() {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/unsubscribe" element={<Unsubscribe />} />
-              <Route path="/dashboard" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><Dashboard /></ProtectedRoute>} />
-              <Route path="/dashboard/posts" element={<ProtectedRoute roles={['admin','contributor']}><DashboardPosts /></ProtectedRoute>} />
-              <Route path="/dashboard/events" element={<ProtectedRoute roles={['admin','contributor']}><DashboardEvents /></ProtectedRoute>} />
-              <Route path="/dashboard/bulletin" element={<ProtectedRoute roles={['admin','contributor']}><DashboardBulletin /></ProtectedRoute>} />
-              <Route path="/dashboard/bulletin/:weekStart" element={<ProtectedRoute roles={['admin','contributor']}><DashboardBulletinEditor /></ProtectedRoute>} />
-              <Route path="/dashboard/users" element={<ProtectedRoute roles={['admin']}><DashboardUsers /></ProtectedRoute>} />
-              <Route path="/dashboard/comments" element={<ProtectedRoute roles={['admin']}><DashboardComments /></ProtectedRoute>} />
-              <Route path="/dashboard/messages" element={<ProtectedRoute roles={['admin']}><DashboardMessages /></ProtectedRoute>} />
-              <Route path="/dashboard/chili-cookoff" element={<ProtectedRoute roles={['admin']}><DashboardChiliCookoff /></ProtectedRoute>} />
-              <Route path="/dashboard/newsletter" element={<ProtectedRoute roles={['admin']}><DashboardNewsletter /></ProtectedRoute>} />
-              <Route path="/dashboard/email" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />
-              <Route path="/dashboard/email/:accountId" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />
-              <Route path="/dashboard/profile" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardProfile /></ProtectedRoute>} />
-              <Route path="/dashboard/directory" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardDirectory /></ProtectedRoute>} />
-              <Route path="/dashboard/donations" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardDonations /></ProtectedRoute>} />
-              <Route path="/dashboard/admin/donations" element={<ProtectedRoute roles={['admin']}><DashboardAdminDonations /></ProtectedRoute>} />
-              <Route path="/dashboard/admin/email" element={<ProtectedRoute roles={['admin']}><DashboardAdminEmail /></ProtectedRoute>} />
-              <Route path="/dashboard/admin/email/monitoring" element={<ProtectedRoute roles={['admin']}><DashboardAdminEmailMonitoring /></ProtectedRoute>} />
+              {/* Routes only accepts Route children, so the Suspense boundary
+                  for the lazy dashboard chunk is a pathless layout route. */}
+              <Route element={<Suspense fallback={dashboardFallback}><Outlet /></Suspense>}>
+                <Route path="/dashboard" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><Dashboard /></ProtectedRoute>} />
+                <Route path="/dashboard/posts" element={<ProtectedRoute roles={['admin','contributor']}><DashboardPosts /></ProtectedRoute>} />
+                <Route path="/dashboard/events" element={<ProtectedRoute roles={['admin','contributor']}><DashboardEvents /></ProtectedRoute>} />
+                <Route path="/dashboard/bulletin" element={<ProtectedRoute roles={['admin','contributor']}><DashboardBulletin /></ProtectedRoute>} />
+                <Route path="/dashboard/bulletin/:weekStart" element={<ProtectedRoute roles={['admin','contributor']}><DashboardBulletinEditor /></ProtectedRoute>} />
+                <Route path="/dashboard/users" element={<ProtectedRoute roles={['admin']}><DashboardUsers /></ProtectedRoute>} />
+                <Route path="/dashboard/comments" element={<ProtectedRoute roles={['admin']}><DashboardComments /></ProtectedRoute>} />
+                <Route path="/dashboard/messages" element={<ProtectedRoute roles={['admin']}><DashboardMessages /></ProtectedRoute>} />
+                <Route path="/dashboard/chili-cookoff" element={<ProtectedRoute roles={['admin']}><DashboardChiliCookoff /></ProtectedRoute>} />
+                <Route path="/dashboard/newsletter" element={<ProtectedRoute roles={['admin']}><DashboardNewsletter /></ProtectedRoute>} />
+                <Route path="/dashboard/email" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />
+                <Route path="/dashboard/email/:accountId" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />
+                <Route path="/dashboard/profile" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardProfile /></ProtectedRoute>} />
+                <Route path="/dashboard/directory" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardDirectory /></ProtectedRoute>} />
+                <Route path="/dashboard/donations" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardDonations /></ProtectedRoute>} />
+                <Route path="/dashboard/admin/donations" element={<ProtectedRoute roles={['admin']}><DashboardAdminDonations /></ProtectedRoute>} />
+                <Route path="/dashboard/admin/email" element={<ProtectedRoute roles={['admin']}><DashboardAdminEmail /></ProtectedRoute>} />
+                <Route path="/dashboard/admin/email/monitoring" element={<ProtectedRoute roles={['admin']}><DashboardAdminEmailMonitoring /></ProtectedRoute>} />
+              </Route>
               {/* Catch-all: unknown URLs render the Not Found page inside the normal layout.
                   The server answers these with a 404 status (see server/spa-routes.js). */}
               <Route path="*" element={<NotFound />} />
@@ -94,6 +114,6 @@ export default function App() {
           </Routes>
         </NotificationProvider>
       </AuthProvider>
-    </BrowserRouter>
+    </>
   );
 }

@@ -5,7 +5,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { initializeDatabase, query } from './db.js';
+import { initializeDatabase } from './db.js';
 import authRoutes from './routes/auth.js';
 import postRoutes from './routes/posts.js';
 import eventRoutes from './routes/events.js';
@@ -34,7 +34,8 @@ import directoryRoutes from './routes/directory.js';
 import bulletinNoteRoutes from './routes/bulletin-notes.js';
 import { initDonationCrons } from './cron/donation-cleanup.js';
 import { requireOriginCheck } from './middleware/origin-check.js';
-import { isKnownSpaPath, ASSET_PATH_RE } from './spa-routes.js';
+import { initSsr } from './ssr.js';
+import { registerSsrRoutes } from './ssr-routes.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -131,8 +132,9 @@ app.all('/api/*', (_req, res) => {
 // static file in public/. Both must sit ahead of the file-404 handler below.
 app.use(sitemapRoutes);
 
-// Serve public/ for AI-generated images and other static assets
-app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d' }));
+// Serve public/ for AI-generated images and other static assets.
+// index:false everywhere: a stray index.html must never shadow the SSR routes.
+app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: '1d', index: false }));
 const distPath = path.join(__dirname, '..', 'dist');
 
 // Hashed Vite assets (js/css) — immutable, cache forever
@@ -141,220 +143,23 @@ app.use('/assets', express.static(path.join(distPath, 'assets'), {
   immutable: true,
 }));
 
-// Other dist files (index.html, etc.) — always revalidate
+// Other dist files — always revalidate. index:false so GET / reaches the SSR
+// route below instead of being answered with the raw template.
 app.use(express.static(distPath, {
   maxAge: 0,
+  index: false,
   setHeaders: (res) => {
     res.set('Cache-Control', 'no-cache');
   },
 }));
 
-// Read index.html template once at startup for blog OGP injection
-const indexHtml = fs.readFileSync(path.join(distPath, 'index.html'), 'utf-8');
-
-// Blog post route with OGP meta tags — injects OG tags into the real index.html
-app.get('/blog/:slug', async (req, res) => {
-  try {
-    const { slug } = req.params;
-    const result = await query(
-      'SELECT title, excerpt, featured_image FROM posts WHERE slug = $1 AND status = $2',
-      [slug, 'published']
-    );
-
-    res.set('Cache-Control', 'no-cache');
-
-    if (result.rows.length === 0) {
-      return res.status(404).type('html').send(renderNotFoundHtml(`/blog/${slug}`));
-    }
-
-    const post = result.rows[0];
-    const siteUrl = 'https://opendoorchristian.church';
-    const postUrl = `${siteUrl}/blog/${slug}`;
-
-    let ogImage = `${siteUrl}/uploads/church-header.webp`;
-    let ogImageType = 'image/webp';
-    if (post.featured_image) {
-      ogImage = post.featured_image.startsWith('http')
-        ? post.featured_image
-        : `${siteUrl}${post.featured_image}`;
-      const ext = post.featured_image.split('.').pop()?.toLowerCase();
-      if (ext === 'jpg' || ext === 'jpeg') ogImageType = 'image/jpeg';
-      else if (ext === 'png') ogImageType = 'image/png';
-      else if (ext === 'gif') ogImageType = 'image/gif';
-      else if (ext === 'webp') ogImageType = 'image/webp';
-    }
-
-    const ogTitle = escapeHtml(post.title || 'Blog Post');
-    const ogDescription = escapeHtml(post.excerpt || 'Read this post');
-
-    const ogTags = `
-  <title>${ogTitle} - Open Door Christian Church</title>
-  <meta name="description" content="${ogDescription}" />
-  <meta property="og:title" content="${ogTitle}" />
-  <meta property="og:description" content="${ogDescription}" />
-  <meta property="og:image" content="${ogImage}" />
-  <meta property="og:image:type" content="${ogImageType}" />
-  <meta property="og:type" content="article" />
-  <meta property="og:url" content="${postUrl}" />
-  <meta property="fb:app_id" content="949925117923722" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${ogTitle}" />
-  <meta name="twitter:description" content="${ogDescription}" />
-  <meta name="twitter:image" content="${ogImage}" />`;
-
-    // Strip existing title, OG, and Twitter meta tags, then inject post-specific ones
-    let html = indexHtml.replace(/<title>[^<]*<\/title>/, '');
-    html = html.replace(/<meta\s+(?:property="(?:og|fb):[^"]*"|name="twitter:[^"]*"|name="description")[^>]*\/?\s*>\s*/g, '');
-    html = html.replace('</head>', ogTags + '\n</head>');
-
-    res.type('html').send(html);
-  } catch (error) {
-    console.error('Blog post SSR error:', error);
-    res.type('html').send(indexHtml);
-  }
-});
-
-// Static-page OG tag injection. Without this, every public page below
-// falls through to the SPA catch-all and gets the homepage's OG tags,
-// so social shares show homepage imagery regardless of which page was
-// shared. The /blog/:slug handler above stays separate because its
-// values are dynamic (per-post).
-const SITE_URL = 'https://opendoorchristian.church';
-const DEFAULT_OG_IMAGE = `${SITE_URL}/uploads/church-header.webp`;
-
-function renderWithOg({ title, description, image = DEFAULT_OG_IMAGE, type = 'website', urlPath }) {
-  const ogImageType = image.toLowerCase().endsWith('.png') ? 'image/png'
-    : image.toLowerCase().endsWith('.gif') ? 'image/gif'
-    : image.toLowerCase().endsWith('.webp') ? 'image/webp' : 'image/jpeg';
-  const ogTitle = escapeHtml(title);
-  const ogDescription = escapeHtml(description);
-  const ogTags = `
-  <title>${ogTitle}</title>
-  <meta name="description" content="${ogDescription}" />
-  <meta property="og:title" content="${ogTitle}" />
-  <meta property="og:description" content="${ogDescription}" />
-  <meta property="og:image" content="${image}" />
-  <meta property="og:image:type" content="${ogImageType}" />
-  <meta property="og:type" content="${type}" />
-  <meta property="og:url" content="${SITE_URL}${urlPath}" />
-  <meta property="fb:app_id" content="949925117923722" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="${ogTitle}" />
-  <meta name="twitter:description" content="${ogDescription}" />
-  <meta name="twitter:image" content="${image}" />`;
-  let html = indexHtml.replace(/<title>[^<]*<\/title>/, '');
-  html = html.replace(/<meta\s+(?:property="(?:og|fb):[^"]*"|name="twitter:[^"]*"|name="description")[^>]*\/?\s*>\s*/g, '');
-  return html.replace('</head>', ogTags + '\n</head>');
-}
-
-/**
- * App shell for an unknown URL. Carries a "Page Not Found" title, noindex,
- * and neutral OG tags; the React router renders the friendly Not Found page.
- */
-function renderNotFoundHtml(urlPath) {
-  const html = renderWithOg({
-    title: 'Page Not Found - Open Door Christian Church',
-    description: "We couldn't find that page. Visit Open Door Christian Church in DeLand, Florida for service times, events, and more.",
-    urlPath,
-  });
-  return html.replace('</head>', '  <meta name="robots" content="noindex" />\n</head>');
-}
-
-const STATIC_OG_PAGES = [
-  {
-    path: '/about',
-    title: 'About Our Church - Open Door Christian Church',
-    description: 'Founded in 1986, Open Door Christian Church serves DeLand, Florida with Scripture-based, Christ-centered worship — including our beloved drive-in service on 87.9 FM.',
-  },
-  {
-    path: '/services',
-    title: 'Service Times - Open Door Christian Church',
-    description: 'Join us for worship at Open Door Christian Church in DeLand, Florida. Communion every Sunday and our unique drive-in service tradition.',
-  },
-  {
-    path: '/events',
-    title: 'Events - Open Door Christian Church',
-    description: 'See upcoming worship services, community events, and fellowship opportunities at Open Door Christian Church in DeLand, Florida.',
-  },
-  {
-    path: '/blog',
-    title: 'Blog - Open Door Christian Church',
-    description: 'Read the latest from Open Door Christian Church — sermons, devotionals, community news, and reflections on faith.',
-  },
-  {
-    path: '/give',
-    title: 'Give - Open Door Christian Church',
-    description: 'Support the ministry of Open Door Christian Church through online giving. Your generosity helps us serve DeLand and beyond.',
-  },
-  {
-    path: '/contact',
-    title: 'Contact Us - Open Door Christian Church',
-    description: 'Get in touch with Open Door Christian Church in DeLand, Florida. Submit a prayer request or send us a message.',
-  },
-  {
-    path: '/joy-ladies-circle',
-    title: 'J.O.Y. Ladies Circle - Open Door Christian Church',
-    description: 'Jesus · Others · Yourself. All women are welcome at the J.O.Y. Ladies Circle of Open Door Christian Church in DeLand, Florida.',
-  },
-  {
-    path: '/chili-cookoff',
-    title: 'Jr Chili Cook-Off Sign-Up - Fall Festival 2026 - Open Door Christian Church',
-    description: 'Register your junior chef (ages 7-19) for the Jr Chili Cook-Off at our Free Family Fall Festival, Saturday, October 17, 2026, 9 AM - 3 PM in DeLand, Florida. Online sign-up open until festival morning.',
-    image: `${SITE_URL}/fall-festival-2026.jpg`,
-  },
-  {
-    path: '/our-pastor',
-    title: 'Meet Pastor Stephen Presley - Open Door Christian Church',
-    description: 'Pastor Stephen Presley serves Open Door Christian Church in DeLand, Florida — a calling forty years in the making.',
-    image: `${SITE_URL}/our-pastor.webp`,
-    type: 'profile',
-  },
-];
-
-for (const page of STATIC_OG_PAGES) {
-  app.get(page.path, (req, res) => {
-    res.set('Cache-Control', 'no-cache');
-    res.type('html').send(renderWithOg({
-      title: page.title,
-      description: page.description,
-      image: page.image,
-      type: page.type,
-      urlPath: page.path,
-    }));
-  });
-}
-
-// File-looking requests that no static handler served (missing bundle,
-// image, font, robots.txt …): plain 404. Serving the app shell here would
-// hand browsers HTML where they expect a script or image.
-app.get(ASSET_PATH_RE, (_req, res) => {
-  res.status(404).type('text').send('Not found');
-});
-
-// SPA catch-all. Known client routes get the shell with 200. Anything else
-// gets the shell with a real 404 status so browsers, crawlers, and link
-// checkers see Not Found while React renders the friendly page.
-app.get('*', (req, res) => {
-  res.set('Cache-Control', 'no-cache');
-  if (isKnownSpaPath(req.path)) {
-    return res.sendFile(path.join(distPath, 'index.html'));
-  }
-  res.status(404).type('html').send(renderNotFoundHtml(req.path));
-});
-
-// Helper function to escape HTML special characters
-function escapeHtml(text) {
-  if (!text) return '';
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+// Server-side rendered public pages + /blog/:slug + file-404 guard +
+// catch-all. Shared with the integration tests — see server/ssr-routes.js.
+registerSsrRoutes(app);
 
 async function start() {
   await initializeDatabase();
+  await initSsr({ distDir: distPath });
   initEmailCrons();
   initDonationCrons();
   checkStuckCampaigns();

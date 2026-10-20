@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="build-id" content="%VITE_BUILD_ID%" />
   <title>Open Door Christian Church - DeLand, FL</title>
   <meta name="description" content="Welcome to Open Door Christian Church in DeLand, Florida. Join us for worship services, community events, and fellowship." />
   <meta property="og:title" content="Open Door Christian Church - DeLand, FL" />
@@ -40,7 +41,7 @@
   </script>
 </head>
 <body>
-  <div id="root"></div>
+  <div id="root"><!--ssr-outlet--></div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 </html>

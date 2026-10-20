@@ -9,6 +9,7 @@ import fs from 'fs/promises';
 import { query } from '../db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { SANITIZE_OPTIONS } from '../data/sanitize-config.js';
+import { getPublishedPosts, getPostBySlug } from '../lib/page-data.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'public', 'uploads');
@@ -23,15 +24,8 @@ const router = Router();
 
 router.get('/', async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 10));
-    const offset = (page - 1) * limit;
-    const result = await query(
-      `SELECT p.*, u.name as author_name FROM posts p JOIN users u ON p.author_id=u.id WHERE p.status='published' ORDER BY p.published_at DESC LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
-    const count = await query("SELECT COUNT(*) FROM posts WHERE status='published'");
-    res.json({ posts: result.rows, total: parseInt(count.rows[0].count), page, limit });
+    const data = await getPublishedPosts({ page: req.query.page, limit: req.query.limit });
+    res.json(data);
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch posts' });
   }
@@ -56,12 +50,9 @@ router.get('/all', authenticateToken, requireRole('admin','contributor'), async 
 
 router.get('/:slug', async (req, res) => {
   try {
-    const result = await query(
-      'SELECT p.*, u.name as author_name FROM posts p JOIN users u ON p.author_id=u.id WHERE p.slug=$1',
-      [req.params.slug]
-    );
-    if (!result.rows.length) return res.status(404).json({ error: 'Post not found' });
-    res.json({ post: result.rows[0] });
+    const post = await getPostBySlug(req.params.slug);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+    res.json({ post });
   } catch {
     res.status(500).json({ error: 'Failed to fetch post' });
   }

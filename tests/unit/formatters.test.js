@@ -6,6 +6,7 @@ import {
   todayET,
   nowET,
   truncate,
+  stripHtml,
 } from '../../src/utils/formatters.js';
 
 describe('formatDate', () => {
@@ -96,5 +97,28 @@ describe('truncate', () => {
   it('returns falsy input untouched', () => {
     expect(truncate(null)).toBeNull();
     expect(truncate('')).toBe('');
+  });
+});
+
+// This suite runs under Node (no document), so it exercises stripHtml's
+// server-side regex path — the one SSR uses.
+describe('stripHtml (Node path)', () => {
+  it('strips tags to spaces so blocks do not run together', () => {
+    expect(stripHtml('<p>Dinner</p><p>Bring chairs</p>')).toBe('Dinner Bring chairs');
+  });
+
+  it('decodes common entities, &amp; last', () => {
+    expect(stripHtml('<p>Coffee &amp; donuts</p>')).toBe('Coffee & donuts');
+    expect(stripHtml('&amp;lt;')).toBe('&lt;');
+    expect(stripHtml('&lt;optional&gt; &quot;x&quot; &#39;y&#39; a&nbsp;b')).toBe('<optional> "x" \'y\' a b');
+  });
+
+  it('collapses whitespace and trims', () => {
+    expect(stripHtml('  <p> a </p>\n<br> b  ')).toBe('a b');
+  });
+
+  it('handles falsy input', () => {
+    expect(stripHtml(null)).toBe('');
+    expect(stripHtml('')).toBe('');
   });
 });

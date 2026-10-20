@@ -46,6 +46,21 @@ export function truncate(str, len = 150) {
 // decode via the DOM so previews don't show literal "&amp;".
 export function stripHtml(html) {
   if (!html) return '';
+  if (typeof document === 'undefined') {
+    // Server-side render path: no DOM, decode the common entities by hand
+    // (&amp; last, or "&amp;lt;" would double-decode into a "<").
+    return html
+      .replace(/<\/?[^>]+>/g, ' ')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
   const tmp = document.createElement('div');
   tmp.innerHTML = html.replace(/<\/?[^>]+>/g, ' ');
   return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();

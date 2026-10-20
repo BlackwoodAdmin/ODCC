@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
 
@@ -14,7 +14,10 @@ const SUGGESTIONS = [
 export default function NotFound() {
   const { pathname } = useLocation();
   const navigate = useNavigate();
-  const canGoBack = typeof window !== 'undefined' && window.history.length > 1;
+  // Set in an effect: deciding during render would hydration-mismatch the
+  // server markup (which never has history) on almost every 404.
+  const [canGoBack, setCanGoBack] = useState(false);
+  useEffect(() => { setCanGoBack(window.history.length > 1); }, []);
 
   return (
     <div>

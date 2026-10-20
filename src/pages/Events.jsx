@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import api from '../services/api';
+import React, { useState } from 'react';
+import useFetch from '../hooks/useFetch';
 import { formatTime, todayET, nowET, containsHtml } from '../utils/formatters';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -9,23 +9,11 @@ export default function Events() {
   const now = nowET();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [events, setEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState(null);
 
-  const fetchEvents = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await api.get(`/events?month=${month}&year=${year}`);
-      setEvents(data.events || []);
-    } catch {
-      setEvents([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [month, year]);
-
-  useEffect(() => { fetchEvents(); }, [fetchEvents]);
+  // Key format must byte-match the SSR loader's (see server/ssr-pages.js)
+  const { data, loading } = useFetch(`/events?month=${month}&year=${year}`);
+  const events = data?.events || [];
 
   const prevMonth = () => {
     if (month === 1) { setMonth(12); setYear(y => y - 1); }

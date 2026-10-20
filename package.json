@@ -9,7 +9,9 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "export VITE_BUILD_ID=$(git rev-parse --short HEAD) && vite build && vite build --ssr src/entry-server.jsx --outDir dist-ssr",
+    "build:client": "vite build",
+    "build:ssr": "vite build --ssr src/entry-server.jsx --outDir dist-ssr",
     "start": "node server/index.js",
     "seed": "node server/seed.js",
     "test": "vitest run",
