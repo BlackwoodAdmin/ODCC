@@ -1,8 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
 import useNotification from '../hooks/useNotification';
-import { formatDate, formatTime } from '../utils/formatters';
+import { formatDate, formatTime, stripHtml, containsHtml, plainTextToHtml } from '../utils/formatters';
+
+const RichTextEditor = lazy(() => import('../components/editors/RichTextEditor'));
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const ORDINALS = ['', '1st', '2nd', '3rd', '4th', '5th'];
@@ -28,9 +30,12 @@ export default function DashboardEvents() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      // An empty editor still emits "<p></p>" — store '' unless the
+      // description is an image with no text (e.g. an event flyer).
+      const description = !stripHtml(form.description) && !/<img/i.test(form.description) ? '' : form.description;
       const payload = {
         title: form.title,
-        description: form.description,
+        description,
         event_date: form.event_date,
         event_time: form.event_time || null,
         end_time: form.end_time || null,
@@ -76,7 +81,10 @@ export default function DashboardEvents() {
   const editEvent = (event) => {
     setForm({
       title: event.title,
-      description: event.description || '',
+      // Legacy plain-text descriptions keep their line breaks in the editor
+      description: event.description && !containsHtml(event.description)
+        ? plainTextToHtml(event.description)
+        : (event.description || ''),
       event_date: event.event_date?.split('T')[0] || '',
       event_time: event.event_time?.slice(0, 5) || '',
       end_time: event.end_time?.slice(0, 5) || '',
@@ -126,7 +134,9 @@ export default function DashboardEvents() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-charcoal mb-2">Description</label>
-                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows={5} className="w-full border border-gray-200 rounded-lg px-4 py-3 resize-none" />
+                <Suspense fallback={<div className="border border-gray-200 rounded-lg p-8 text-center text-gray-500">Loading editor...</div>}>
+                  <RichTextEditor value={form.description} onChange={description => setForm(f => ({ ...f, description }))} placeholder="Describe the event..." />
+                </Suspense>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div>

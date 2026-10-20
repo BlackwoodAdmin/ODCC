@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import sanitizeHtml from 'sanitize-html';
 import { query } from '../db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { SANITIZE_OPTIONS } from '../data/sanitize-config.js';
 
 const router = Router();
 
@@ -150,10 +152,11 @@ router.get('/all', authenticateToken, requireRole('admin','contributor'), async 
 router.post('/', authenticateToken, requireRole('admin','contributor'), async (req, res) => {
   try {
     const { title, description, location, event_date, event_time, end_date, end_time, recurrence, day_of_week, week_of_month } = req.body;
+    const cleanDescription = description ? sanitizeHtml(description, SANITIZE_OPTIONS) : description;
     const now = Date.now();
     const result = await query(
       'INSERT INTO events (title,description,location,event_date,event_time,end_date,end_time,recurrence,day_of_week,week_of_month,author_id,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING *',
-      [title, description, location, event_date, event_time || null, end_date || event_date, end_time || null, recurrence || null, day_of_week ?? null, week_of_month ?? null, req.user.id, now, now]
+      [title, cleanDescription, location, event_date, event_time || null, end_date || event_date, end_time || null, recurrence || null, day_of_week ?? null, week_of_month ?? null, req.user.id, now, now]
     );
     res.status(201).json({ event: result.rows[0] });
   } catch (err) {
@@ -168,10 +171,11 @@ router.put('/:id', authenticateToken, requireRole('admin','contributor'), async 
     if (!ev.rows.length) return res.status(404).json({ error: 'Event not found' });
     if (req.user.role !== 'admin' && ev.rows[0].author_id !== req.user.id) return res.status(403).json({ error: 'Not authorized' });
     const { title, description, location, event_date, event_time, end_date, end_time, recurrence, day_of_week, week_of_month } = req.body;
+    const cleanDescription = description ? sanitizeHtml(description, SANITIZE_OPTIONS) : description;
     const now = Date.now();
     const result = await query(
       'UPDATE events SET title=$1,description=$2,location=$3,event_date=$4,event_time=$5,end_date=$6,end_time=$7,recurrence=$8,day_of_week=$9,week_of_month=$10,updated_at=$11 WHERE id=$12 RETURNING *',
-      [title, description, location, event_date, event_time, end_date, end_time, recurrence || null, day_of_week ?? null, week_of_month ?? null, now, req.params.id]
+      [title, cleanDescription, location, event_date, event_time, end_date, end_time, recurrence || null, day_of_week ?? null, week_of_month ?? null, now, req.params.id]
     );
     res.json({ event: result.rows[0] });
   } catch {

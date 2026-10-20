@@ -41,3 +41,31 @@ export function truncate(str, len = 150) {
   if (!str || str.length <= len) return str;
   return str.substring(0, len) + '...';
 }
+
+// Tags become spaces so adjacent blocks don't run together, then entities
+// decode via the DOM so previews don't show literal "&amp;".
+export function stripHtml(html) {
+  if (!html) return '';
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html.replace(/<\/?[^>]+>/g, ' ');
+  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
+}
+
+// Only tags the rich text editor emits count as HTML, so legacy plain-text
+// values like "<optional>" aren't misread (and then destroyed) as markup.
+// Single-letter tags must close immediately — the editor writes them without
+// attributes — so "<b wing>" stays plain text.
+export function containsHtml(str) {
+  if (!str) return false;
+  return /<(p|br|div|strong|em|a|ul|ol|li|h[1-6]|blockquote|img|pre|code|hr|span)[\s/>]|<[bius][/>]/i.test(str);
+}
+
+// Escape before wrapping (same order as server/scripts/migrate-blog-content.js)
+// so "<" and "&" in plain text survive. Blank lines become paragraphs; single
+// newlines stay as <br> so address blocks don't gain paragraph gaps.
+export function plainTextToHtml(str) {
+  const text = (str || '').replace(/\r/g, '').trim();
+  if (!text) return '';
+  const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return '<p>' + escaped.replace(/\n\n+/g, '</p><p>').replace(/\n/g, '<br>') + '</p>';
+}

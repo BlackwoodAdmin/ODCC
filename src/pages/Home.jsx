@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useFetch from '../hooks/useFetch';
 import useAuth from '../hooks/useAuth';
-import { formatDate } from '../utils/formatters';
+import { formatDate, truncate, stripHtml, containsHtml } from '../utils/formatters';
 import RegisterModal from '../components/RegisterModal';
 
 export default function Home() {
@@ -153,7 +153,7 @@ export default function Home() {
                     <span className="text-sage font-bold">{formatDate(event.event_date)}</span>
                   </div>
                   <h3 className="text-xl font-bold text-charcoal mb-2">{event.title}</h3>
-                  <p className="text-gray-600 text-sm mb-3">{event.description?.substring(0, 120)}...</p>
+                  <p className="text-gray-600 text-sm mb-3">{truncate(containsHtml(event.description) ? stripHtml(event.description) : event.description, 120)}</p>
                   {event.location && <p className="text-sm text-sage"><span className="font-medium">Location:</span> {event.location}</p>}
                 </div>
               ))}

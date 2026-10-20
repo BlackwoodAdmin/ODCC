@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import api from '../services/api';
-import { formatTime, todayET, nowET } from '../utils/formatters';
+import { formatTime, todayET, nowET, containsHtml } from '../utils/formatters';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -179,7 +179,11 @@ export default function Events() {
                           {ev.event_time && <span>🕐 {formatTime(ev.event_time)}{ev.end_time ? ` - ${formatTime(ev.end_time)}` : ''}</span>}
                           {ev.location && <span>📍 {ev.location}</span>}
                         </div>
-                        <p className="text-gray-600">{ev.description}</p>
+                        {ev.description && (containsHtml(ev.description) ? (
+                          <div className="prose max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: ev.description }} />
+                        ) : (
+                          <p className="text-gray-600 whitespace-pre-line">{ev.description}</p>
+                        ))}
                       </div>
                     ))}
                   </div>
