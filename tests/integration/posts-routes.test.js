@@ -62,6 +62,28 @@ describe('GET /api/posts/:slug', () => {
     const res = await request(app).get('/api/posts/nope');
     expect(res.status).toBe(404);
   });
+
+  it('404s drafts for anonymous requests', async () => {
+    await createPost({ authorId: admin.id, slug: 'secret-draft', status: 'draft' });
+    const res = await request(app).get('/api/posts/secret-draft');
+    expect(res.status).toBe(404);
+  });
+
+  it('404s drafts for subscribers', async () => {
+    await createPost({ authorId: admin.id, slug: 'secret-draft', status: 'draft' });
+    const subscriber = await createUser({ email: 'sub2@test.local', role: 'subscriber' });
+    const res = await request(app).get('/api/posts/secret-draft').set(authHeader(subscriber));
+    expect(res.status).toBe(404);
+  });
+
+  it('serves drafts to admins and contributors as a preview', async () => {
+    await createPost({ authorId: admin.id, slug: 'secret-draft', status: 'draft' });
+    for (const user of [admin, contributor]) {
+      const res = await request(app).get('/api/posts/secret-draft').set(authHeader(user));
+      expect(res.status).toBe(200);
+      expect(res.body.post.status).toBe('draft');
+    }
+  });
 });
 
 describe('GET /api/posts/all', () => {

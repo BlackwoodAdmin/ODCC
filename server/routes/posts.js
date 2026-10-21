@@ -7,7 +7,7 @@ import sanitizeHtml from 'sanitize-html';
 import sharp from 'sharp';
 import fs from 'fs/promises';
 import { query } from '../db.js';
-import { authenticateToken, requireRole } from '../middleware/auth.js';
+import { authenticateToken, optionalAuth, requireRole } from '../middleware/auth.js';
 import { SANITIZE_OPTIONS } from '../data/sanitize-config.js';
 import { getPublishedPosts, getPostBySlug } from '../lib/page-data.js';
 
@@ -48,9 +48,11 @@ router.get('/all', authenticateToken, requireRole('admin','contributor'), async 
   }
 });
 
-router.get('/:slug', async (req, res) => {
+// Drafts are 404 to the public; admins and contributors can preview them.
+router.get('/:slug', optionalAuth, async (req, res) => {
   try {
-    const post = await getPostBySlug(req.params.slug);
+    const canSeeDrafts = ['admin', 'contributor'].includes(req.user?.role);
+    const post = await getPostBySlug(req.params.slug, { publishedOnly: !canSeeDrafts });
     if (!post) return res.status(404).json({ error: 'Post not found' });
     res.json({ post });
   } catch {
