@@ -168,7 +168,7 @@ export default function Events() {
                           {ev.location && <span>📍 {ev.location}</span>}
                         </div>
                         {ev.description && (containsHtml(ev.description) ? (
-                          <div className="prose max-w-none text-gray-600" dangerouslySetInnerHTML={{ __html: ev.description }} />
+                          <div className="prose max-w-none text-gray-600 overflow-x-auto" dangerouslySetInnerHTML={{ __html: ev.description }} />
                         ) : (
                           <p className="text-gray-600 whitespace-pre-line">{ev.description}</p>
                         ))}

@@ -9,6 +9,7 @@ import { TextStyle, FontSize } from '@tiptap/extension-text-style';
 import TextAlign from '@tiptap/extension-text-align';
 import Paragraph from '@tiptap/extension-paragraph';
 import Heading from '@tiptap/extension-heading';
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table';
 import api from '../../services/api';
 
 const FONT_SIZES = ['12px', '14px', '16px', '18px', '20px', '24px', '28px', '32px', '36px'];
@@ -147,6 +148,52 @@ const StyledImage = Image.extend({
   },
 });
 
+// Same hazard for tables: preserve the attributes the server sanitizer allows
+// (style, plus legacy bgcolor/width/align/valign from pasted newsletters).
+// Spreading this.parent?.() keeps the built-in colspan/rowspan/colwidth.
+function withPassthroughAttrs(node, names) {
+  return node.extend({
+    addAttributes() {
+      const attrs = { ...this.parent?.() };
+      for (const name of names) {
+        attrs[name] = {
+          default: null,
+          parseHTML: el => el.getAttribute(name),
+          renderHTML: a => (a[name] != null ? { [name]: a[name] } : {}),
+        };
+      }
+      return attrs;
+    },
+  });
+}
+
+const CELL_ATTRS = ['style', 'width', 'height', 'bgcolor', 'align', 'valign'];
+// The table's own style wins over TipTap's generated min-width, so a
+// hand-written <table style="..."> round-trips exactly.
+const StyledTable = withPassthroughAttrs(Table, ['style', 'border', 'cellpadding', 'cellspacing', 'width', 'bgcolor', 'align']);
+const StyledTableRow = withPassthroughAttrs(TableRow, ['style', 'bgcolor', 'align', 'valign']);
+const StyledTableHeader = withPassthroughAttrs(TableHeader, CELL_ATTRS);
+const StyledTableCell = withPassthroughAttrs(TableCell, CELL_ATTRS);
+
+// Exported for the schema round-trip tests (tests/unit/rich-text-tables.test.js):
+// the schema decides what setContent keeps, so tests must build it exactly as
+// the component does.
+export function buildExtensions({ alignment = false, fontSize = false, placeholder = '' } = {}) {
+  return [
+    alignment
+      ? StarterKit.configure({ paragraph: false, heading: false })
+      : StarterKit.configure({ heading: { levels: [2, 3] } }),
+    ...(alignment ? [BlogParagraph, BlogHeading, BlogTextAlign] : []),
+    Underline,
+    Link.configure({ openOnClick: false }),
+    StyledImage.configure({ inline: false }),
+    StyledTable, StyledTableRow, StyledTableHeader, StyledTableCell,
+    TextStyle,
+    ...(fontSize ? [ToolbarFontSize] : []),
+    Placeholder.configure({ placeholder }),
+  ];
+}
+
 function ToolbarButton({ onClick, active, children, title }) {
   return (
     <button
@@ -237,18 +284,7 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
   const [showImageModal, setShowImageModal] = useState(false);
 
   const editor = useEditor({
-    extensions: [
-      alignment
-        ? StarterKit.configure({ paragraph: false, heading: false })
-        : StarterKit.configure({ heading: { levels: [2, 3] } }),
-      ...(alignment ? [BlogParagraph, BlogHeading, BlogTextAlign] : []),
-      Underline,
-      Link.configure({ openOnClick: false }),
-      StyledImage.configure({ inline: false }),
-      TextStyle,
-      ...(fontSize ? [ToolbarFontSize] : []),
-      Placeholder.configure({ placeholder }),
-    ],
+    extensions: buildExtensions({ alignment, fontSize, placeholder }),
     content: value || '',
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML());
@@ -268,9 +304,12 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
   const toggleHtml = useCallback(() => {
     if (!editor) return;
     if (showHtml) {
-      // Apply HTML source back to editor
+      // Apply HTML source back to the editor and propagate the NORMALIZED
+      // html, so form state matches what the editor now holds (what you see
+      // after toggling is exactly what saves). Saving from the HTML view
+      // without toggling back still keeps the raw source (textarea onChange).
       editor.commands.setContent(htmlSource);
-      onChange(htmlSource);
+      onChange(editor.getHTML());
     } else {
       setHtmlSource(editor.getHTML());
     }
@@ -283,17 +322,20 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
   }, [editor]);
 
   // Cursor-dependent toolbar state. Without this the toolbar only re-renders
-  // on content changes, not when the cursor moves. Returns null (no
-  // subscription effects) when neither feature is on.
+  // on content changes, not when the cursor moves. Always subscribed so the
+  // contextual table buttons appear when the cursor enters a table; the hook's
+  // deep-equal default means it only re-renders when a value changes.
   const toolbarState = useEditorState({
     editor,
     selector: ({ editor: e }) => {
-      if (!e || (!alignment && !fontSize)) return null;
-      const size = e.getAttributes('textStyle').fontSize;
-      return {
-        fontSize: FONT_SIZES.includes(size) ? size : DEFAULT_FONT_SIZE,
-        textAlign: ['center', 'right'].find(a => e.isActive({ textAlign: a })) || 'left',
-      };
+      if (!e) return null;
+      const state = { inTable: e.isActive('table') };
+      if (alignment || fontSize) {
+        const size = e.getAttributes('textStyle').fontSize;
+        state.fontSize = FONT_SIZES.includes(size) ? size : DEFAULT_FONT_SIZE;
+        state.textAlign = ['center', 'right'].find(a => e.isActive({ textAlign: a })) || 'left';
+      }
+      return state;
     },
   });
 
@@ -344,6 +386,23 @@ export default function RichTextEditor({ value, onChange, placeholder = 'Start w
           title="Link"
         >Link</ToolbarButton>
         <ToolbarButton onClick={() => setShowImageModal(true)} title="Image">Img</ToolbarButton>
+        {/* Insert is hidden inside a table: inserting at a cursor in a cell
+            would nest a table there — pasted nested tables still round-trip. */}
+        {!toolbarState.inTable && (
+          <ToolbarButton onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()} title="Insert Table">Table</ToolbarButton>
+        )}
+        {toolbarState.inTable && (
+          <>
+            <span className="w-px h-5 bg-gray-300 mx-1" />
+            <ToolbarButton onClick={() => editor.chain().focus().addRowAfter().run()} title="Add Row Below">+Row</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().deleteRow().run()} title="Delete Row">&minus;Row</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().addColumnAfter().run()} title="Add Column Right">+Col</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().deleteColumn().run()} title="Delete Column">&minus;Col</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().toggleHeaderRow().run()} title="Toggle Header Row">Hdr</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().mergeOrSplit().run()} title="Merge or Split Cells">Merge</ToolbarButton>
+            <ToolbarButton onClick={() => editor.chain().focus().deleteTable().run()} title="Delete Table">&times;Tbl</ToolbarButton>
+          </>
+        )}
         <span className="w-px h-5 bg-gray-300 mx-1" />
         <ToolbarButton onClick={() => editor.chain().focus().toggleBlockquote().run()} active={editor.isActive('blockquote')} title="Blockquote">&ldquo;</ToolbarButton>
         <ToolbarButton onClick={() => editor.chain().focus().toggleCodeBlock().run()} active={editor.isActive('codeBlock')} title="Code Block">&lt;/&gt;</ToolbarButton>

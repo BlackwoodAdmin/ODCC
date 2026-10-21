@@ -72,7 +72,7 @@ export function stripHtml(html) {
 // attributes — so "<b wing>" stays plain text.
 export function containsHtml(str) {
   if (!str) return false;
-  return /<(p|br|div|strong|em|a|ul|ol|li|h[1-6]|blockquote|img|pre|code|hr|span)[\s/>]|<[bius][/>]/i.test(str);
+  return /<(p|br|div|strong|em|a|ul|ol|li|h[1-6]|blockquote|img|pre|code|hr|span|table)[\s/>]|<[bius][/>]/i.test(str);
 }
 
 // Escape before wrapping (same order as server/scripts/migrate-blog-content.js)

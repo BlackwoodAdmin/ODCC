@@ -65,7 +65,7 @@ export default function BlogPost() {
           {post.featured_image && (
             <img src={post.featured_image} alt={post.title} className="w-full rounded-xl mb-8 shadow-md" />
           )}
-          <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed" dangerouslySetInnerHTML={{ __html: post.content }} />
+          <div className="prose prose-lg max-w-none text-gray-700 leading-relaxed overflow-x-auto" dangerouslySetInnerHTML={{ __html: post.content }} />
 
           {/* Comments */}
           <div className="mt-16 border-t border-gray-200 pt-12">

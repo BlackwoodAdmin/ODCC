@@ -7,6 +7,7 @@ import {
   nowET,
   truncate,
   stripHtml,
+  containsHtml,
 } from '../../src/utils/formatters.js';
 
 describe('formatDate', () => {
@@ -120,5 +121,20 @@ describe('stripHtml (Node path)', () => {
   it('handles falsy input', () => {
     expect(stripHtml(null)).toBe('');
     expect(stripHtml('')).toBe('');
+  });
+});
+
+describe('containsHtml', () => {
+  it('recognizes tags the rich text editor emits, including tables', () => {
+    expect(containsHtml('<p>hi</p>')).toBe(true);
+    // Bare-cell table saved via the HTML source view (no <p> wrappers)
+    expect(containsHtml('<table><tr><td>9:00</td><td>Worship</td></tr></table>')).toBe(true);
+  });
+
+  it('still treats legacy plain-text values as plain', () => {
+    expect(containsHtml('Bring a <optional> side dish')).toBe(false);
+    expect(containsHtml('Potluck at 6')).toBe(false);
+    expect(containsHtml('')).toBe(false);
+    expect(containsHtml(null)).toBe(false);
   });
 });

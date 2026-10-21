@@ -31,8 +31,9 @@ export default function DashboardEvents() {
     e.preventDefault();
     try {
       // An empty editor still emits "<p></p>" — store '' unless the
-      // description is an image with no text (e.g. an event flyer).
-      const description = !stripHtml(form.description) && !/<img/i.test(form.description) ? '' : form.description;
+      // description is an image (e.g. an event flyer) or a table skeleton
+      // with no text yet.
+      const description = !stripHtml(form.description) && !/<img|<table/i.test(form.description) ? '' : form.description;
       const payload = {
         title: form.title,
         description,
