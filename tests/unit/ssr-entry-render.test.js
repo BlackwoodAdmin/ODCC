@@ -37,7 +37,7 @@ const COMMENT = { id: 1, post_id: 1, author_name: 'Fixture Commenter', content: 
 
 const STATIC_ROUTES = [
   '/about', '/our-pastor', '/services', '/give', '/contact',
-  '/chili-cookoff', '/joy-ladies-circle', '/login', '/register',
+  '/joy-ladies-circle', '/login', '/register',
   '/forgot-password', '/reset-password', '/unsubscribe',
 ];
 

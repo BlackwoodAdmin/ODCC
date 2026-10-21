@@ -28,7 +28,6 @@ describe('buildSitemapXml', () => {
   it('lists static pages, published posts with lastmod, and escapes XML', () => {
     const xml = buildSitemapXml({
       siteUrl: 'https://example.org',
-      today: '2026-09-03',
       posts: [
         { slug: 'hello-world', published_at: Date.UTC(2026, 7, 1), updated_at: Date.UTC(2026, 7, 15) },
         { slug: 'a&b', published_at: Date.UTC(2026, 6, 4), updated_at: null },
@@ -37,18 +36,12 @@ describe('buildSitemapXml', () => {
     expect(xml).toMatch(/^<\?xml version="1.0" encoding="UTF-8"\?>\n<urlset xmlns="http:\/\/www\.sitemaps\.org\/schemas\/sitemap\/0\.9">/);
     expect(xml).toContain('<loc>https://example.org/</loc>');
     expect(xml).toContain('<loc>https://example.org/about</loc>');
-    expect(xml).toContain('<loc>https://example.org/chili-cookoff</loc>');
     expect(xml).toContain('<loc>https://example.org/blog/hello-world</loc>\n    <lastmod>2026-08-15</lastmod>');
     expect(xml).toContain('<loc>https://example.org/blog/a&amp;b</loc>\n    <lastmod>2026-07-04</lastmod>');
     // /blog itself carries the newest post date
     expect(xml).toContain('<loc>https://example.org/blog</loc>\n    <lastmod>2026-08-15</lastmod>');
     expect(xml).not.toContain('/login');
     expect(xml).not.toContain('/dashboard');
-  });
-
-  it('drops the Fall Festival page after festival day', () => {
-    const xml = buildSitemapXml({ siteUrl: 'https://example.org', today: '2026-10-18', posts: [] });
-    expect(xml).not.toContain('/chili-cookoff');
   });
 });
 

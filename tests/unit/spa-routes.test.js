@@ -18,7 +18,7 @@ describe('SPA route manifest', () => {
 
 describe('isKnownSpaPath', () => {
   it.each([
-    '/', '/about', '/about/', '/events', '/chili-cookoff', '/blog', '/blog/some-post-slug', '/blog/v2.0-update',
+    '/', '/about', '/about/', '/events', '/blog', '/blog/some-post-slug', '/blog/v2.0-update',
     '/dashboard', '/dashboard/email/5', '/dashboard/bulletin/2026-09-01', '/dashboard/admin/email/monitoring',
     '/blog/caf%C3%A9-night',
   ])('accepts %s', (p) => expect(isKnownSpaPath(p)).toBe(true));
@@ -33,7 +33,7 @@ describe('ASSET_PATH_RE', () => {
   it.each(['/assets/missing.js', '/uploads/gone.webp', '/robots.txt', '/sitemap.xml', '/favicon.ico', '/fonts/x.woff2', '/old-page.html'])(
     'treats %s as a file request', (p) => expect(ASSET_PATH_RE.test(p)).toBe(true)
   );
-  it.each(['/about', '/blog/v2.0-update', '/dashboard/bulletin/2026-09-01', '/chili-cookoff'])(
+  it.each(['/about', '/blog/v2.0-update', '/dashboard/bulletin/2026-09-01', '/joy-ladies-circle'])(
     'does not treat %s as a file request', (p) => expect(ASSET_PATH_RE.test(p)).toBe(false)
   );
 });

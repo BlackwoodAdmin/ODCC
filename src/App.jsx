@@ -13,7 +13,6 @@ import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
 import Give from './pages/Give';
 import Contact from './pages/Contact';
-import ChiliCookoff from './pages/ChiliCookoff';
 import JoyLadiesCircle from './pages/JoyLadiesCircle';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -31,7 +30,6 @@ const DashboardEvents = lazy(() => import('./pages/DashboardEvents'));
 const DashboardUsers = lazy(() => import('./pages/DashboardUsers'));
 const DashboardComments = lazy(() => import('./pages/DashboardComments'));
 const DashboardMessages = lazy(() => import('./pages/DashboardMessages'));
-const DashboardChiliCookoff = lazy(() => import('./pages/DashboardChiliCookoff'));
 const DashboardEmail = lazy(() => import('./pages/DashboardEmail'));
 const DashboardAdminEmail = lazy(() => import('./pages/DashboardAdminEmail'));
 const DashboardAdminEmailMonitoring = lazy(() => import('./pages/DashboardAdminEmailMonitoring'));
@@ -78,7 +76,6 @@ export default function App() {
               <Route path="/blog/:id" element={<BlogPost />} />
               <Route path="/give" element={<Give />} />
               <Route path="/contact" element={<Contact />} />
-              <Route path="/chili-cookoff" element={<ChiliCookoff />} />
               <Route path="/joy-ladies-circle" element={<JoyLadiesCircle />} />
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -96,7 +93,6 @@ export default function App() {
                 <Route path="/dashboard/users" element={<ProtectedRoute roles={['admin']}><DashboardUsers /></ProtectedRoute>} />
                 <Route path="/dashboard/comments" element={<ProtectedRoute roles={['admin']}><DashboardComments /></ProtectedRoute>} />
                 <Route path="/dashboard/messages" element={<ProtectedRoute roles={['admin']}><DashboardMessages /></ProtectedRoute>} />
-                <Route path="/dashboard/chili-cookoff" element={<ProtectedRoute roles={['admin']}><DashboardChiliCookoff /></ProtectedRoute>} />
                 <Route path="/dashboard/newsletter" element={<ProtectedRoute roles={['admin']}><DashboardNewsletter /></ProtectedRoute>} />
                 <Route path="/dashboard/email" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />
                 <Route path="/dashboard/email/:accountId" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />

@@ -15,6 +15,10 @@ export function registerSsrRoutes(app) {
     app.get(page.path, ssrHandler({ head: page.head, loader: page.loader }));
   }
 
+  // Jr Chili Cook-Off (Fall Festival 2026) is retired, but the URL was on
+  // printed flyers and shared posts — keep it alive as a redirect.
+  app.get('/chili-cookoff', (_req, res) => res.redirect(301, '/events'));
+
   // Blog posts: per-post head (OG tags for social sharing previews) + SSR
   // body with the post and its approved comments preloaded.
   app.get('/blog/:slug', (req, res) => {

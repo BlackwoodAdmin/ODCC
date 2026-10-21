@@ -11,13 +11,6 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // deliberately absent (they are also disallowed in public/robots.txt).
 const STATIC_PAGES = ['/', '/about', '/our-pastor', '/services', '/events', '/blog', '/give', '/contact', '/joy-ladies-circle'];
 
-// Fall Festival 2026 sign-up: listed through festival day, then drops off.
-const CHILI_COOKOFF_LAST_DAY = '2026-10-17';
-
-function todayET() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
-}
-
 function escapeXml(s) {
   return String(s)
     .replace(/&/g, '&amp;')
@@ -36,15 +29,12 @@ function isoDate(ms) {
 /**
  * Pure builder so it can be unit tested. `posts` are { slug, published_at, updated_at }.
  */
-export function buildSitemapXml({ posts = [], siteUrl = SITE_URL, today = todayET() } = {}) {
+export function buildSitemapXml({ posts = [], siteUrl = SITE_URL } = {}) {
   const entries = [];
   const latestPost = posts.reduce((max, p) => Math.max(max, Number(p.updated_at) || 0, Number(p.published_at) || 0), 0);
 
   for (const path of STATIC_PAGES) {
     entries.push({ loc: `${siteUrl}${path}`, lastmod: path === '/blog' && latestPost ? isoDate(latestPost) : null });
-  }
-  if (today <= CHILI_COOKOFF_LAST_DAY) {
-    entries.push({ loc: `${siteUrl}/chili-cookoff`, lastmod: null });
   }
   for (const p of posts) {
     if (!p.slug) continue;

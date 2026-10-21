@@ -87,6 +87,12 @@ describe('SSR pages', () => {
     expect(res.text).toContain('<div id="root"></div>');
   });
 
+  it('redirects the retired chili cook-off page to /events', async () => {
+    const res = await request(app).get('/chili-cookoff');
+    expect(res.status).toBe(301);
+    expect(res.headers.location).toBe('/events');
+  });
+
   it('SSRs unknown URLs as a 404 NotFound page', async () => {
     const res = await request(app).get('/definitely-not-a-page');
     expect(res.status).toBe(404);
