@@ -31,7 +31,10 @@ import { initEmailCrons } from './cron/email-cron.js';
 import donationRoutes from './routes/donations.js';
 import directoryRoutes from './routes/directory.js';
 import bulletinNoteRoutes from './routes/bulletin-notes.js';
+import assistantRoutes from './routes/assistant.js';
+import chatRoutes from './routes/chat.js';
 import { initDonationCrons } from './cron/donation-cleanup.js';
+import { initChatMaintenance } from './cron/chat-maintenance.js';
 import { requireOriginCheck } from './middleware/origin-check.js';
 import { initSsr } from './ssr.js';
 import { registerSsrRoutes } from './ssr-routes.js';
@@ -121,6 +124,11 @@ app.use('/api/email', emailAdminLogRoutes);
 // Donation routes (origin check on public create-payment-intent; webhook excluded — has Stripe sig)
 app.use('/api/donations', requireOriginCheck, donationRoutes);
 
+// Ask Open Door assistant + live chat (public mutations -> origin check; the
+// SSE GETs pass through the middleware untouched)
+app.use('/api/assistant', requireOriginCheck, assistantRoutes);
+app.use('/api/chat', requireOriginCheck, chatRoutes);
+
 // Anything under /api that no router handled: JSON 404, never the SPA shell.
 app.all('/api/*', (_req, res) => {
   res.status(404).json({ error: 'Not found' });
@@ -160,6 +168,7 @@ async function start() {
   await initSsr({ distDir: distPath });
   initEmailCrons();
   initDonationCrons();
+  initChatMaintenance();
   checkStuckCampaigns();
   if (process.env.NODE_ENV === 'production' && !process.env.TURNSTILE_SECRET_KEY) {
     console.error('CRITICAL: TURNSTILE_SECRET_KEY not set — all public forms will reject requests');

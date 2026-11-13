@@ -94,7 +94,7 @@ export async function sendPasswordResetEmail(to, token) {
   return sendEmail({ to, subject: 'Reset your password — Open Door Christian Church', html });
 }
 
-function escapeHtml(str) {
+export function escapeHtml(str) {
   if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')

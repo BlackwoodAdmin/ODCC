@@ -31,6 +31,7 @@ export const SPA_ROUTE_PATTERNS = [
   '/dashboard/users',
   '/dashboard/comments',
   '/dashboard/messages',
+  '/dashboard/chats',
   '/dashboard/newsletter',
   '/dashboard/email',
   '/dashboard/email/:accountId',

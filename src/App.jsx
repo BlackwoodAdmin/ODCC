@@ -41,6 +41,7 @@ const DashboardDirectory = lazy(() => import('./pages/DashboardDirectory'));
 const DashboardAdminDonations = lazy(() => import('./pages/DashboardAdminDonations'));
 const DashboardBulletin = lazy(() => import('./pages/DashboardBulletin'));
 const DashboardBulletinEditor = lazy(() => import('./pages/DashboardBulletinEditor'));
+const DashboardChats = lazy(() => import('./pages/DashboardChats'));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -95,6 +96,7 @@ export default function App() {
                 <Route path="/dashboard/users" element={<ProtectedRoute roles={['admin']}><DashboardUsers /></ProtectedRoute>} />
                 <Route path="/dashboard/comments" element={<ProtectedRoute roles={['admin']}><DashboardComments /></ProtectedRoute>} />
                 <Route path="/dashboard/messages" element={<ProtectedRoute roles={['admin']}><DashboardMessages /></ProtectedRoute>} />
+                <Route path="/dashboard/chats" element={<ProtectedRoute roles={['admin']}><DashboardChats /></ProtectedRoute>} />
                 <Route path="/dashboard/newsletter" element={<ProtectedRoute roles={['admin']}><DashboardNewsletter /></ProtectedRoute>} />
                 <Route path="/dashboard/email" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />
                 <Route path="/dashboard/email/:accountId" element={<ProtectedRoute roles={['admin','contributor','subscriber']}><DashboardEmail /></ProtectedRoute>} />

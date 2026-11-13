@@ -294,7 +294,37 @@ export async function initializeDatabase() {
       created_at BIGINT NOT NULL,
       updated_at BIGINT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS chat_sessions (
+      id UUID PRIMARY KEY,
+      status VARCHAR(10) NOT NULL DEFAULT 'waiting',
+      end_reason VARCHAR(16),
+      page_url TEXT,
+      user_agent TEXT,
+      chat_history JSONB NOT NULL DEFAULT '[]',
+      created_at BIGINT NOT NULL,
+      updated_at BIGINT NOT NULL,
+      connected_at BIGINT,
+      ended_at BIGINT,
+      last_activity_at BIGINT NOT NULL,
+      fallback_email_at BIGINT
+    );
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id BIGSERIAL PRIMARY KEY,
+      session_id UUID NOT NULL REFERENCES chat_sessions(id) ON DELETE CASCADE,
+      sender VARCHAR(10) NOT NULL,
+      content TEXT NOT NULL,
+      created_at BIGINT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS chat_agent_presence (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      available BOOLEAN NOT NULL DEFAULT FALSE,
+      updated_at BIGINT NOT NULL
+    );
   `);
+  await pool.query(
+    `INSERT INTO chat_agent_presence (id, available, updated_at) VALUES (1, FALSE, $1) ON CONFLICT (id) DO NOTHING`,
+    [Date.now()]
+  );
   await pool.query(`
     CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id);
     CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status);
@@ -324,6 +354,9 @@ export async function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_donation_subs_email ON donation_subscriptions(donor_email);
     CREATE INDEX IF NOT EXISTS idx_donation_subs_status ON donation_subscriptions(status);
     CREATE INDEX IF NOT EXISTS idx_donation_subs_customer ON donation_subscriptions(stripe_customer_id);
+
+    CREATE INDEX IF NOT EXISTS idx_chat_messages_session ON chat_messages(session_id, id);
+    CREATE INDEX IF NOT EXISTS idx_chat_sessions_status ON chat_sessions(status, created_at DESC);
   `);
 
   // These indexes use expressions/WHERE clauses not supported by IF NOT EXISTS in all PG versions

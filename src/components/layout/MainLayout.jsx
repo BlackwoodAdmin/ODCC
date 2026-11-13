@@ -4,6 +4,7 @@ import Header from './Header';
 import Footer from './Footer';
 import Notification from '../common/Notification';
 import ExitPopup from '../common/ExitPopup';
+import SiteAssistant from '../assistant/SiteAssistant';
 import useExitIntent from '../../hooks/useExitIntent';
 import useAuth from '../../hooks/useAuth';
 
@@ -27,6 +28,7 @@ export default function MainLayout() {
       </main>
       <Footer />
       <ExitPopup open={showExitPopup} onClose={() => setShowExitPopup(false)} />
+      <SiteAssistant />
     </div>
   );
 }
