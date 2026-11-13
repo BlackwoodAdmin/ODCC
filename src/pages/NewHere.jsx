@@ -19,7 +19,7 @@ const SUNDAY_TIMELINE = [
     desc: 'Bring your Bible, your questions, and an open heart. Newcomers are always welcome to just listen.',
   },
   {
-    time: '11:00 AM', name: 'Indoor Chapel Service', place: 'Chapel',
+    time: '11:00 AM', name: 'Indoor Service', place: 'Chapel',
     desc: 'Hymns, communion, prayer, and the message in the air-conditioned chapel. Same sermon as the drive-in.',
     highlight: true,
   },

@@ -19,7 +19,7 @@ export default function Services() {
       icon: '📖'
     },
     {
-      time: '11:00 AM', name: 'Indoor Chapel Service (Chapel)', day: 'Sunday',
+      time: '11:00 AM', name: 'Indoor Service (Chapel)', day: 'Sunday',
       desc: 'Our full worship service in the air-conditioned chapel — hymns, communion, prayer, and the message. The same sermon as the drive-in, so come whichever way fits you best.',
       icon: '⛪', highlight: true
     },

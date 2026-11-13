@@ -206,7 +206,7 @@ export async function sendVisitWelcomeEmail({ to, name, visitDate }) {
             <tr><td style="padding:5px 0;color:#1f2937;font-weight:600;font-size:14px;white-space:nowrap;">8:30 AM</td><td style="padding:5px 0 5px 14px;color:#6b7280;font-size:14px;">Fellowship time in the chapel — coffee and breakfast foods</td></tr>
             <tr><td style="padding:5px 0;color:#1f2937;font-weight:600;font-size:14px;white-space:nowrap;">9:00 AM</td><td style="padding:5px 0 5px 14px;color:#6b7280;font-size:14px;">Drive-in service in the garden — tune your radio to FM 87.9</td></tr>
             <tr><td style="padding:5px 0;color:#1f2937;font-weight:600;font-size:14px;white-space:nowrap;">10:15 AM</td><td style="padding:5px 0 5px 14px;color:#6b7280;font-size:14px;">Bible study in the chapel</td></tr>
-            <tr><td style="padding:5px 0;color:#1f2937;font-weight:600;font-size:14px;white-space:nowrap;">11:00 AM</td><td style="padding:5px 0 5px 14px;color:#6b7280;font-size:14px;">Indoor chapel service — hymns, communion, prayer, and the message</td></tr>
+            <tr><td style="padding:5px 0;color:#1f2937;font-weight:600;font-size:14px;white-space:nowrap;">11:00 AM</td><td style="padding:5px 0 5px 14px;color:#6b7280;font-size:14px;">Indoor service in the chapel — hymns, communion, prayer, and the message</td></tr>
           </table>
           <p style="margin:10px 0 0;color:#9ca3af;font-size:13px;">The 9:00 drive-in and 11:00 chapel service share the same sermon — come to whichever fits you best, or make a morning of it. Communion is served every Sunday.</p>
         </div>
