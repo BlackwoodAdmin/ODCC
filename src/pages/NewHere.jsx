@@ -6,7 +6,7 @@ import Turnstile from '../components/common/Turnstile';
 
 const SUNDAY_TIMELINE = [
   {
-    time: '8:30 AM', name: 'Fellowship Time', place: 'Chapel',
+    time: '8:30 AM', name: 'Fellowship Time', place: 'Sanctuary',
     desc: 'Coffee, breakfast foods, and friendly faces. A relaxed way to arrive early and say hello.',
   },
   {
@@ -15,12 +15,12 @@ const SUNDAY_TIMELINE = [
     highlight: true,
   },
   {
-    time: '10:15 AM', name: 'Bible Study', place: 'Chapel',
+    time: '10:15 AM', name: 'Bible Study', place: 'Sanctuary',
     desc: 'Bring your Bible, your questions, and an open heart. Newcomers are always welcome to just listen.',
   },
   {
-    time: '11:00 AM', name: 'Indoor Service', place: 'Chapel',
-    desc: 'Hymns, communion, prayer, and the message in the air-conditioned chapel. Same sermon as the drive-in.',
+    time: '11:00 AM', name: 'Indoor Service', place: 'Sanctuary',
+    desc: 'Hymns, communion, prayer, and the message in the air-conditioned sanctuary. Same sermon as the drive-in.',
     highlight: true,
   },
 ];
@@ -36,7 +36,7 @@ const FAQS = [
   },
   {
     icon: '⛪', q: 'Which service should I pick?',
-    a: 'The 9:00 drive-in and the 11:00 chapel service share the same sermon, so choose whichever fits you best — or come at 8:30 and make a whole morning of it.',
+    a: 'The 9:00 drive-in and the 11:00 sanctuary service share the same sermon, so choose whichever fits you best — or come at 8:30 and make a whole morning of it.',
   },
   {
     icon: '🍞', q: 'What about communion?',
@@ -99,7 +99,7 @@ export default function NewHere() {
           <div className="flex flex-wrap justify-center gap-6 md:gap-12 text-center text-sm md:text-base">
             <div><span className="font-bold">Sundays</span> <span className="opacity-80">8:30 AM – 12:00 PM</span></div>
             <div><span className="font-bold">Drive-In</span> <span className="opacity-80">9:00 AM · FM 87.9</span></div>
-            <div><span className="font-bold">Chapel</span> <span className="opacity-80">11:00 AM</span></div>
+            <div><span className="font-bold">Sanctuary</span> <span className="opacity-80">11:00 AM</span></div>
             <div><span className="font-bold">📍</span> <span className="opacity-80">1700 S Clara Ave, DeLand</span></div>
           </div>
         </div>
@@ -173,7 +173,7 @@ export default function NewHere() {
                 </div>
                 <div className="bg-cream rounded-xl p-6">
                   <h3 className="font-bold text-charcoal mb-2">🅿️ Parking</h3>
-                  <p className="text-gray-600 text-sm">Joining the 9:00 drive-in? Pull right into the garden and tune to 87.9 FM. For chapel services, park in the lot and come on in — someone will be glad to point the way.</p>
+                  <p className="text-gray-600 text-sm">Joining the 9:00 drive-in? Pull right into the garden and tune to 87.9 FM. For sanctuary services, park in the lot and come on in — someone will be glad to point the way.</p>
                 </div>
                 <div className="bg-cream rounded-xl p-6">
                   <h3 className="font-bold text-charcoal mb-2">📞 Phone</h3>

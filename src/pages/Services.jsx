@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 export default function Services() {
   const services = [
     {
-      time: '8:30 AM', name: 'Fellowship Time (Chapel)', day: 'Sunday',
+      time: '8:30 AM', name: 'Fellowship Time (Sanctuary)', day: 'Sunday',
       desc: 'Coffee, breakfast foods, and good fellowship to start the day.',
       icon: '🌅'
     },
@@ -14,13 +14,13 @@ export default function Services() {
       icon: '🚗', highlight: true, radio: true
     },
     {
-      time: '10:15 AM', name: 'Bible Study (Chapel)', day: 'Sunday',
+      time: '10:15 AM', name: 'Bible Study (Sanctuary)', day: 'Sunday',
       desc: 'Bring your Bible, your questions, and an open heart.',
       icon: '📖'
     },
     {
-      time: '11:00 AM', name: 'Indoor Service (Chapel)', day: 'Sunday',
-      desc: 'Our full worship service in the air-conditioned chapel — hymns, communion, prayer, and the message. The same sermon as the drive-in, so come whichever way fits you best.',
+      time: '11:00 AM', name: 'Indoor Service (Sanctuary)', day: 'Sunday',
+      desc: 'Our full worship service in the air-conditioned sanctuary — hymns, communion, prayer, and the message. The same sermon as the drive-in, so come whichever way fits you best.',
       icon: '⛪', highlight: true
     },
     {

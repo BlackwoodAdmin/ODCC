@@ -38,7 +38,7 @@ export default function Home() {
             <div><span className="font-bold">Fellowship</span> <span className="opacity-80">Sun 8:30 AM</span></div>
             <div><span className="font-bold">Drive-In</span> <span className="opacity-80">Sun 9:00 AM · FM 87.9</span></div>
             <div><span className="font-bold">Bible Study</span> <span className="opacity-80">Sun 10:15 AM</span></div>
-            <div><span className="font-bold">Chapel</span> <span className="opacity-80">Sun 11:00 AM</span></div>
+            <div><span className="font-bold">Sanctuary</span> <span className="opacity-80">Sun 11:00 AM</span></div>
 
             <div><span className="font-bold">Wednesday</span> <span className="opacity-80">6:00 PM</span></div>
           </div>
@@ -53,7 +53,7 @@ export default function Home() {
             <div className="w-20 h-1 bg-sage mx-auto mb-8"></div>
             <p className="text-lg text-gray-600 leading-relaxed mb-6">
               At Open Door Christian Church, you'll find a warm, welcoming community rooted in God's Word. 
-              Whether you join us in the chapel or from your car during our unique drive-in service, 
+              Whether you join us in the sanctuary or from your car during our unique drive-in service, 
               there's a place here for you and your family.
             </p>
             <p className="text-lg text-gray-600 leading-relaxed mb-8">
