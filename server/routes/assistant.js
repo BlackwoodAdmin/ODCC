@@ -11,6 +11,7 @@
 import { Router } from 'express';
 import { verifyTurnstile } from '../middleware/turnstile.js';
 import { buildSystemPrompt } from '../lib/assistant-context.js';
+import { getTeachingContext } from '../lib/teaching-documents.js';
 import { isCrisisMessage, CRISIS_RESPONSE } from '../lib/crisis-phrases.js';
 import { createToken, verifyToken, CHAT_SESSION_PURPOSE } from '../lib/chat-session-token.js';
 import { sanitizeChatText } from '../lib/chat-db.js';
@@ -111,10 +112,13 @@ router.post('/', async (req, res) => {
 
     try {
       const systemPrompt = await buildSystemPrompt();
+      // Topic-gated teaching documents: appended only when the message or
+      // recent turns touch the topic, so ordinary chats pay no extra tokens.
+      const teachingContext = getTeachingContext(cleanMessage, turns);
       const response = await client.chat.completions.create({
         model: AI_MODEL,
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: systemPrompt + teachingContext },
           ...turns,
           { role: 'user', content: cleanMessage },
         ],
