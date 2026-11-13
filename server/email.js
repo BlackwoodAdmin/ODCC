@@ -214,8 +214,8 @@ export async function sendVisitWelcomeEmail({ to, name, visitDate }) {
           <p style="margin:0;color:#3f5c38;font-size:13px;line-height:1.6;">
             <strong>First time at a drive-in service?</strong> Pull into the garden, tune your car radio to
             <strong>87.9 FM</strong>, and worship right from your seat. Roll the windows down, bring your coffee —
-            pajamas welcome. Outdoor speakers are set up if you'd rather sit outside, and the fellowship hall is
-            open before and after.
+            pajamas welcome. Outdoor speakers are set up if you prefer a chair under the sky, and the kitchen is
+            open before and after with hot breakfast items, donuts, coffee and juice.
           </p>
         </div>
         <div style="text-align:center;margin:28px 0;">
