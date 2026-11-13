@@ -61,7 +61,7 @@ export default function SiteAssistant() {
   const [crisisPinned, setCrisisPinned] = useState(false);
   const verificationRetriedRef = useRef(false);
   const pendingEscalationRef = useRef(false);
-  const bottomRef = useRef(null);
+  const scrollRef = useRef(null);
 
   const turnstileConfigured = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
 
@@ -145,10 +145,15 @@ export default function SiteAssistant() {
     else if (liveChat.status === 'ended' || liveChat.status === 'idle') store(KEYS.LIVE_SESSION, null);
   }, [liveChat.sessionId, liveChat.status, mounted]);
 
-  // ---- autoscroll
+  // ---- autoscroll: scroll the messages CONTAINER (never scrollIntoView,
+  // which can also scroll the page behind the widget), and re-run for
+  // everything that changes the list's height — including the typing
+  // indicator, which otherwise appears below the fold where the visitor
+  // never sees it.
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages, liveChat.messages, isOpen]);
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, liveChat.messages, liveChat.isAgentTyping, liveChat.status, sending, isOpen]);
 
   // ---- escalation
   const historyTurns = useCallback(() => (
@@ -333,7 +338,7 @@ export default function SiteAssistant() {
           )}
 
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-cream/40">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3 bg-cream/40">
             {messages.map((m) => (
               <MessageBubble key={m.id} role={m.role} content={m.content} crisis={m.crisis} />
             ))}
@@ -354,7 +359,6 @@ export default function SiteAssistant() {
             {sending && (
               <div className="flex justify-start"><div className="bg-white rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm"><span className="inline-flex gap-1"><Dot /><Dot delay="150ms" /><Dot delay="300ms" /></span></div></div>
             )}
-            <div ref={bottomRef} />
           </div>
 
           {/* Talk to a person */}
