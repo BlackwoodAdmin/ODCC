@@ -28,7 +28,7 @@ const SUNDAY_TIMELINE = [
 const FAQS = [
   {
     icon: '👕', q: 'What should I wear?',
-    a: "Come as you are — there's no dress code. At the drive-in you'll see everything from Sunday best to pajamas, and all of it is welcome.",
+    a: "Come as you are — there's no dress code. At Open Door you'll see everything from Sunday best to shorts, t-shirts, and flip flops. All of it is welcome.",
   },
   {
     icon: '🚗', q: 'How does the drive-in work?',
