@@ -275,6 +275,20 @@ export default function SiteAssistant() {
     addMessage('info', 'Live chat ended. I\'m still here if you need anything else!');
   };
 
+  // Clear button: wipe the conversation and start fresh. Ends a live chat if
+  // one is running. Keeps the chatSessionToken — it's only CAPTCHA proof, so
+  // the visitor shouldn't have to re-verify just because they started over.
+  const handleClear = () => {
+    if (!window.confirm('Clear this conversation and start over?')) return;
+    if (liveActive) liveChat.endChat();
+    store(KEYS.LIVE_SESSION, null);
+    store(KEYS.MESSAGES, null);
+    setMessages([GREETING]);
+    setCrisisPinned(false);
+    setEscalationOffered(false);
+    setInput('');
+  };
+
   // Dashboard pages never show the widget; render nothing until mounted
   // (SSR contract: no browser-only output in the server-rendered HTML).
   if (!mounted || location.pathname.startsWith('/dashboard')) return null;
@@ -302,6 +316,9 @@ export default function SiteAssistant() {
               {liveActive && (
                 <button onClick={handleEndLiveChat} className="text-xs bg-white/15 hover:bg-white/25 rounded-full px-2.5 py-1" title="End live chat">End</button>
               )}
+              <button onClick={handleClear} className="p-1.5 hover:bg-white/15 rounded-full" aria-label="Clear conversation and start over" title="Clear chat">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+              </button>
               <button onClick={() => setIsOpen(false)} className="p-1.5 hover:bg-white/15 rounded-full" aria-label="Close chat">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
               </button>
