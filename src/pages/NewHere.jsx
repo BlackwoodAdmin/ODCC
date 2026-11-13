@@ -32,7 +32,7 @@ const FAQS = [
   },
   {
     icon: '🚗', q: 'How does the drive-in work?',
-    a: 'Pull into the garden, tune your car radio to 87.9 FM, and worship from your seat. Outdoor speakers are set up if you prefer a chair under the sky, and the fellowship hall is open before and after.',
+    a: 'Pull into the garden, tune your car radio to 87.9 FM, and worship from your seat. Outdoor speakers are set up if you prefer a chair under the sky, and the Kitchen is open before and after with hot breakfast items, donuts, coffee and juice.',
   },
   {
     icon: '⛪', q: 'Which service should I pick?',
