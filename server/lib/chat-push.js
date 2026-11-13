@@ -31,7 +31,12 @@ export function isPushConfigured() {
 let webPush = null;
 let vapidApplied = false;
 async function getWebPush() {
-  if (!webPush) webPush = (await import('web-push')).default;
+  if (!webPush) {
+    // web-push v4 is pure ESM (named exports, no default); older versions are
+    // CJS where the default-interop carries the API. Accept both shapes.
+    const mod = await import('web-push');
+    webPush = mod.default ?? mod;
+  }
   if (!vapidApplied) {
     webPush.setVapidDetails(
       process.env.VAPID_SUBJECT || 'mailto:hello@opendoorchristian.church',

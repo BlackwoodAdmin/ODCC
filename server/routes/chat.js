@@ -487,7 +487,8 @@ router.post('/admin/push/test', ...admin, async (_req, res) => {
   try {
     const result = await sendNewChatPush('test', '/dashboard/chats');
     res.json({ result });
-  } catch {
+  } catch (err) {
+    console.error('[ChatPush] test failed:', err.message || err);
     res.status(500).json({ error: 'Test push failed' });
   }
 });

@@ -8,6 +8,17 @@ beforeAll(() => {
   if (!process.env.VAPID_PRIVATE_KEY) process.env.VAPID_PRIVATE_KEY = 'test-vapid-private-key';
 });
 
+describe('web-push module interop', () => {
+  it('resolves the API whether the package is pure ESM (v4) or CJS-interop', async () => {
+    // web-push v4 dropped the default export; grabbing `.default` alone made
+    // setVapidDetails undefined IN PRODUCTION while every other test passed.
+    const mod = await import('web-push');
+    const api = mod.default ?? mod;
+    expect(typeof api.setVapidDetails).toBe('function');
+    expect(typeof api.sendNotification).toBe('function');
+  });
+});
+
 describe('push receipt tokens', () => {
   it('round-trips', () => {
     const token = createPushReceiptToken('abc-123');
