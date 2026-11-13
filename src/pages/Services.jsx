@@ -66,7 +66,7 @@ export default function Services() {
         <div className="container-custom text-center">
           <h2 className="text-3xl font-bold text-charcoal mb-4">Communion Every Sunday</h2>
           <p className="text-gray-600 max-w-2xl mx-auto mb-8">We celebrate the Lord’s Supper every Sunday as a central part of our worship, remembering Christ’s sacrifice and our unity as His body.</p>
-          <Link to="/contact" className="btn-primary">Plan Your Visit</Link>
+          <Link to="/new-here" className="btn-primary">Plan Your Visit</Link>
         </div>
       </section>
     </div>

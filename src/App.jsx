@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import About from './pages/About';
 import OurPastor from './pages/OurPastor';
 import Services from './pages/Services';
+import NewHere from './pages/NewHere';
 import Events from './pages/Events';
 import Blog from './pages/Blog';
 import BlogPost from './pages/BlogPost';
@@ -71,6 +72,7 @@ export default function App() {
               <Route path="/about" element={<About />} />
               <Route path="/our-pastor" element={<OurPastor />} />
               <Route path="/services" element={<Services />} />
+              <Route path="/new-here" element={<NewHere />} />
               <Route path="/events" element={<Events />} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:id" element={<BlogPost />} />

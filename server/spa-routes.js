@@ -11,6 +11,7 @@ export const SPA_ROUTE_PATTERNS = [
   '/about',
   '/our-pastor',
   '/services',
+  '/new-here',
   '/events',
   '/blog',
   '/blog/:id',

@@ -353,6 +353,12 @@ export async function initializeDatabase() {
   try { await pool.query("ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'contact'"); } catch (e) {
     if (!e.message.includes('already exists')) throw e;
   }
+  try { await pool.query('ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS visit_date VARCHAR(20)'); } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+  }
+  try { await pool.query('ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS followed_up BOOLEAN DEFAULT FALSE'); } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+  }
   try { await pool.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(20)'); } catch (e) {
     if (!e.message.includes('already exists')) throw e;
   }

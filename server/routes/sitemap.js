@@ -9,7 +9,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 
 // Public, indexable pages. Login/registration/password/unsubscribe pages are
 // deliberately absent (they are also disallowed in public/robots.txt).
-const STATIC_PAGES = ['/', '/about', '/our-pastor', '/services', '/events', '/blog', '/give', '/contact', '/joy-ladies-circle'];
+const STATIC_PAGES = ['/', '/about', '/our-pastor', '/services', '/new-here', '/events', '/blog', '/give', '/contact', '/joy-ladies-circle'];
 
 function escapeXml(s) {
   return String(s)

@@ -108,13 +108,20 @@ export default function Header() {
                 )}
               </div>
 
+              <NavLink
+                to="/new-here"
+                className={({ isActive }) => `text-sm font-semibold px-4 py-2 rounded-full shadow-sm transition-all duration-200 ${isActive ? 'bg-earth text-white' : 'bg-earth text-white hover:opacity-90 hover:shadow-md'}`}
+              >
+                I'm New
+              </NavLink>
+
               {user ? (
-                <div className="flex items-center gap-3 ml-4">
+                <div className="flex items-center gap-3 ml-2">
                   <Link to="/dashboard" className="btn-primary text-sm !py-2 !px-4">Dashboard</Link>
                   <button onClick={logout} className="text-sm text-gray-500 hover:text-charcoal">Logout</button>
                 </div>
               ) : (
-                <div className="flex items-center gap-3 ml-4">
+                <div className="flex items-center gap-3 ml-2">
                   <button onClick={() => setRegisterOpen(true)} className="btn-primary text-sm !py-2 !px-4">Sign Up</button>
                   <Link to="/login" className="text-sm font-medium text-charcoal hover:text-sage">Login</Link>
                 </div>
@@ -131,6 +138,13 @@ export default function Header() {
           {mobileOpen && (
             <nav className="lg:hidden pb-4 border-t border-gray-100 pt-4">
               <div className="flex flex-col gap-3">
+                <NavLink
+                  to="/new-here"
+                  onClick={() => setMobileOpen(false)}
+                  className="bg-earth text-white text-sm font-semibold px-4 py-2.5 rounded-full text-center shadow-sm"
+                >
+                  👋 I'm New — Plan a Visit
+                </NavLink>
                 {navLinks.map(link => (
                   <NavLink key={link.to} to={link.to} className={linkClass} onClick={() => setMobileOpen(false)} end={link.to === '/'}>{link.label}</NavLink>
                 ))}

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query } from '../db.js';
 import { authenticateToken, requireRole } from '../middleware/auth.js';
 import { requireTurnstile } from '../middleware/turnstile.js';
+import { sendVisitWelcomeEmail } from '../email.js';
 
 const router = Router();
 
@@ -40,6 +41,30 @@ router.post('/prayer', requireTurnstile, async (req, res) => {
   }
 });
 
+router.post('/visit', requireTurnstile, async (req, res) => {
+  try {
+    const { name, email, phone, visitDate, message } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Name and email required' });
+    if (name.length > 255) return res.status(400).json({ error: 'Name too long (max 255 characters)' });
+    if (email.length > 255 || !email.includes('@') || !email.includes('.')) return res.status(400).json({ error: 'Invalid email address' });
+    if (phone && phone.length > 20) return res.status(400).json({ error: 'Phone number too long (max 20 characters)' });
+    if (message && message.length > 5000) return res.status(400).json({ error: 'Message too long (max 5000 characters)' });
+    if (visitDate && !/^\d{4}-\d{2}-\d{2}$/.test(visitDate)) return res.status(400).json({ error: 'Invalid visit date' });
+    const storedMessage = message?.trim() || 'Planning a first visit.';
+    await query(
+      'INSERT INTO contact_submissions (name, email, phone, message, type, visit_date, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)',
+      [name, email, phone || null, storedMessage, 'visit', visitDate || null, Date.now()]
+    );
+    // Welcome email is best-effort: never block or fail the submission on it.
+    sendVisitWelcomeEmail({ to: email, name, visitDate }).catch(err => {
+      console.error('[Contact] Visit welcome email failed:', err.message);
+    });
+    res.status(201).json({ success: true, message: "We can't wait to meet you! Check your inbox — we just sent everything you need for your first visit." });
+  } catch {
+    res.status(500).json({ error: 'Failed to submit visit plan' });
+  }
+});
+
 router.get('/', authenticateToken, requireRole('admin'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -67,6 +92,15 @@ router.put('/:id/read', authenticateToken, requireRole('admin'), async (req, res
     res.json({ success: true });
   } catch {
     res.status(500).json({ error: 'Failed to mark as read' });
+  }
+});
+
+router.put('/:id/followed-up', authenticateToken, requireRole('admin'), async (req, res) => {
+  try {
+    await query('UPDATE contact_submissions SET followed_up=$1 WHERE id=$2', [!!req.body.followedUp, req.params.id]);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Failed to update follow-up status' });
   }
 });
 

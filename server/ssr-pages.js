@@ -62,6 +62,14 @@ export const SSR_PAGES = [
     },
   },
   {
+    path: '/new-here',
+    head: {
+      title: 'New to Open Door? - Open Door Christian Church',
+      description: 'Planning your first visit to Open Door Christian Church in DeLand, Florida? Here are our Sunday service times, what to expect, directions, and a warm welcome.',
+      urlPath: '/new-here',
+    },
+  },
+  {
     path: '/give',
     head: {
       title: 'Give - Open Door Christian Church',

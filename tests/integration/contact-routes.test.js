@@ -64,6 +64,62 @@ describe('POST /api/contact/prayer', () => {
   });
 });
 
+describe('POST /api/contact/visit', () => {
+  it('stores the submission with type=visit and the planned date', async () => {
+    const res = await request(app).post('/api/contact/visit').send({
+      name: 'Jane', email: 'jane@test.local', phone: '555-1212',
+      visitDate: '2026-11-22', message: 'Bringing my two kids',
+    });
+    expect(res.status).toBe(201);
+    const { rows } = await query('SELECT type, visit_date, message, followed_up FROM contact_submissions');
+    expect(rows).toEqual([{ type: 'visit', visit_date: '2026-11-22', message: 'Bringing my two kids', followed_up: false }]);
+  });
+
+  it('defaults the message and allows a missing visit date', async () => {
+    const res = await request(app).post('/api/contact/visit').send({
+      name: 'Jane', email: 'jane@test.local',
+    });
+    expect(res.status).toBe(201);
+    const { rows } = await query('SELECT visit_date, message FROM contact_submissions');
+    expect(rows).toEqual([{ visit_date: null, message: 'Planning a first visit.' }]);
+  });
+
+  it('requires name and email', async () => {
+    const res = await request(app).post('/api/contact/visit').send({ name: 'x' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a malformed visit date', async () => {
+    const res = await request(app).post('/api/contact/visit').send({
+      name: 'x', email: 'x@test.local', visitDate: 'next sunday',
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/visit date/i);
+  });
+});
+
+describe('PUT /api/contact/:id/followed-up', () => {
+  it('admin can set and clear follow-up status', async () => {
+    const { rows: [row] } = await query(
+      `INSERT INTO contact_submissions (name, email, message, type, created_at) VALUES ('A', 'a@test.local', 'm', 'visit', $1) RETURNING id`,
+      [Date.now()]
+    );
+    let res = await request(app).put(`/api/contact/${row.id}/followed-up`).set(authHeader(admin)).send({ followedUp: true });
+    expect(res.status).toBe(200);
+    expect((await query('SELECT followed_up FROM contact_submissions WHERE id=$1', [row.id])).rows[0].followed_up).toBe(true);
+
+    res = await request(app).put(`/api/contact/${row.id}/followed-up`).set(authHeader(admin)).send({ followedUp: false });
+    expect(res.status).toBe(200);
+    expect((await query('SELECT followed_up FROM contact_submissions WHERE id=$1', [row.id])).rows[0].followed_up).toBe(false);
+  });
+
+  it('rejects non-admins', async () => {
+    const sub = await createUser({ email: 'sub2@test.local', role: 'subscriber' });
+    const res = await request(app).put('/api/contact/1/followed-up').set(authHeader(sub)).send({ followedUp: true });
+    expect(res.status).toBe(403);
+  });
+});
+
 describe('GET /api/contact (admin)', () => {
   beforeEach(async () => {
     await query(
