@@ -208,7 +208,7 @@ export async function sendVisitWelcomeEmail({ to, name, visitDate }) {
             <tr><td style="padding:5px 0;color:#1f2937;font-weight:600;font-size:14px;white-space:nowrap;">10:15 AM</td><td style="padding:5px 0 5px 14px;color:#6b7280;font-size:14px;">Bible study in the sanctuary</td></tr>
             <tr><td style="padding:5px 0;color:#1f2937;font-weight:600;font-size:14px;white-space:nowrap;">11:00 AM</td><td style="padding:5px 0 5px 14px;color:#6b7280;font-size:14px;">Indoor service in the sanctuary — hymns, communion, prayer, and the message</td></tr>
           </table>
-          <p style="margin:10px 0 0;color:#9ca3af;font-size:13px;">The 9:00 drive-in and 11:00 sanctuary service share the same sermon — come to whichever fits you best, or make a morning of it. Communion is served every Sunday.</p>
+          <p style="margin:10px 0 0;color:#9ca3af;font-size:13px;">The 9:00 drive-in and 11:00 indoor service share the same sermon — come to whichever fits you best, or make a morning of it. Communion is served every Sunday.</p>
         </div>
         <div style="background:#f0f7ee;border:1px solid #cfe0c8;border-radius:8px;padding:16px;margin:20px 0;">
           <p style="margin:0;color:#3f5c38;font-size:13px;line-height:1.6;">

@@ -36,7 +36,7 @@ const FAQS = [
   },
   {
     icon: '⛪', q: 'Which service should I pick?',
-    a: 'The 9:00 drive-in and the 11:00 sanctuary service share the same sermon, so choose whichever fits you best — or come at 8:30 and make a whole morning of it.',
+    a: 'The 9:00 drive-in and the 11:00 indoor service share the same sermon, so choose whichever fits you best — or come at 8:30 and make a whole morning of it.',
   },
   {
     icon: '🍞', q: 'What about communion?',
@@ -173,7 +173,7 @@ export default function NewHere() {
                 </div>
                 <div className="bg-cream rounded-xl p-6">
                   <h3 className="font-bold text-charcoal mb-2">🅿️ Parking</h3>
-                  <p className="text-gray-600 text-sm">Joining the 9:00 drive-in? Pull right into the garden and tune to 87.9 FM. For sanctuary services, park in the lot and come on in — someone will be glad to point the way.</p>
+                  <p className="text-gray-600 text-sm">Joining the 9:00 drive-in? Pull right into the garden and tune to 87.9 FM. For indoor services, park in the lot and come on in — someone will be glad to point the way.</p>
                 </div>
                 <div className="bg-cream rounded-xl p-6">
                   <h3 className="font-bold text-charcoal mb-2">📞 Phone</h3>
