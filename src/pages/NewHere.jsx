@@ -99,7 +99,7 @@ export default function NewHere() {
           <div className="flex flex-wrap justify-center gap-6 md:gap-12 text-center text-sm md:text-base">
             <div><span className="font-bold">Sundays</span> <span className="opacity-80">8:30 AM – 12:00 PM</span></div>
             <div><span className="font-bold">Drive-In</span> <span className="opacity-80">9:00 AM · FM 87.9</span></div>
-            <div><span className="font-bold">Sanctuary</span> <span className="opacity-80">11:00 AM</span></div>
+            <div><span className="font-bold">Indoor Service</span> <span className="opacity-80">11:00 AM</span></div>
             <div><span className="font-bold">📍</span> <span className="opacity-80">1700 S Clara Ave, DeLand</span></div>
           </div>
         </div>

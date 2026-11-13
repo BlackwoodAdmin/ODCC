@@ -38,7 +38,7 @@ export default function Home() {
             <div><span className="font-bold">Fellowship</span> <span className="opacity-80">Sun 8:30 AM</span></div>
             <div><span className="font-bold">Drive-In</span> <span className="opacity-80">Sun 9:00 AM · FM 87.9</span></div>
             <div><span className="font-bold">Bible Study</span> <span className="opacity-80">Sun 10:15 AM</span></div>
-            <div><span className="font-bold">Sanctuary</span> <span className="opacity-80">Sun 11:00 AM</span></div>
+            <div><span className="font-bold">Indoor Service</span> <span className="opacity-80">Sun 11:00 AM</span></div>
 
             <div><span className="font-bold">Wednesday</span> <span className="opacity-80">6:00 PM</span></div>
           </div>
