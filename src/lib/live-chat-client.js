@@ -65,6 +65,7 @@ const INITIAL_STATE = {
   endReason: null,
   messages: [],
   isAgentAvailable: false,
+  isAgentTyping: false,
 };
 
 export class LiveChatClient {
@@ -265,6 +266,10 @@ export class LiveChatClient {
       const available = Boolean(data?.available);
       if (available !== this.state.isAgentAvailable) this.setState({ isAgentAvailable: available });
     });
+    on('typing', (raw) => {
+      const data = this.parse(raw);
+      this.setState({ isAgentTyping: Boolean(data?.typing) });
+    });
     stream.addEventListener('error', () => {
       if (generation !== this.generation || this.stream !== stream) return;
       if (stream.readyState === EVENT_SOURCE_CLOSED) {
@@ -358,7 +363,7 @@ export class LiveChatClient {
       // Close client-side: a server close alone makes EventSource retry forever.
       this.closeStream();
       this.clearResponseTimer();
-      this.setState({ endReason });
+      this.setState({ endReason, isAgentTyping: false });
       this.updateStatus('ended');
     }
     // 'waiting' keeps 'connecting'
@@ -406,7 +411,7 @@ export class LiveChatClient {
     this.reconnectAttempt = 0;
     this.hasReceivedAgentMessage = false;
     this.seenIds.clear();
-    this.setState({ sessionId: null, messages: [], endReason: null });
+    this.setState({ sessionId: null, messages: [], endReason: null, isAgentTyping: false });
   }
 
   /** Stop network activity and timers. Stays usable (strict mode re-runs effects). */

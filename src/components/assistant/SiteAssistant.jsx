@@ -323,6 +323,9 @@ export default function SiteAssistant() {
             {liveChat.status === 'connecting' && (
               <p className="text-center text-xs text-gray-500 animate-pulse">Waiting for someone from the church to join… (we'll keep trying for a few minutes)</p>
             )}
+            {liveChat.status === 'connected' && liveChat.isAgentTyping && (
+              <div className="flex justify-start"><div className="bg-earth/10 border border-earth/20 rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm"><span className="inline-flex gap-1"><Dot /><Dot delay="150ms" /><Dot delay="300ms" /></span></div></div>
+            )}
             {sending && (
               <div className="flex justify-start"><div className="bg-white rounded-2xl rounded-bl-sm px-4 py-2.5 shadow-sm"><span className="inline-flex gap-1"><Dot /><Dot delay="150ms" /><Dot delay="300ms" /></span></div></div>
             )}

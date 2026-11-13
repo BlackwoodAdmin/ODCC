@@ -36,7 +36,8 @@ async function escalate(ip, overrides = {}) {
 }
 
 beforeEach(async () => {
-  await resetTables(['chat_messages', 'chat_sessions', 'chat_agent_presence', 'users']);
+  await resetTables(['chat_messages', 'chat_sessions', 'chat_agent_presence',
+    'chat_presence_schedule', 'chat_push_subscriptions', 'site_settings', 'users']);
   admin = await createUser({ email: 'admin@test.local', role: 'admin' });
 });
 
@@ -252,6 +253,162 @@ describe('maintenance sweeps (DAL)', () => {
     await query('UPDATE chat_sessions SET ended_at = $2 WHERE id = $1', [s, Date.now() - RETENTION_MS - 1000]);
     expect(await purgeOldSessions()).toBe(1);
     expect((await query('SELECT COUNT(*)::int AS c FROM chat_sessions')).rows[0].c).toBe(0);
+  });
+});
+
+describe('weekly presence schedule', () => {
+  const openAllWeek = Array.from({ length: 7 }, () => ({ enabled: true, open: '00:00', close: '23:59' }));
+  const closedAllWeek = Array.from({ length: 7 }, () => ({ enabled: false, open: '09:00', close: '17:00' }));
+
+  it('GET returns defaults (disabled, Mon–Fri 9–5, Eastern) when nothing saved', async () => {
+    const res = await request(app).get('/api/chat/admin/schedule').set(authHeader(admin));
+    expect(res.status).toBe(200);
+    expect(res.body.enabled).toBe(false);
+    expect(res.body.timezone).toBe('America/New_York');
+    expect(res.body.days).toHaveLength(7);
+    expect(res.body.overrideActive).toBe(false);
+  });
+
+  it('PUT validates the shape', async () => {
+    const bad = await request(app).put('/api/chat/admin/schedule').set(authHeader(admin))
+      .send({ enabled: true, days: [{ enabled: true, open: '18:00', close: '09:00' }] });
+    expect(bad.status).toBe(400);
+  });
+
+  it('saving an enabled schedule immediately reconciles presence', async () => {
+    expect((await request(app).get('/api/chat/presence')).body.available).toBe(false);
+    const res = await request(app).put('/api/chat/admin/schedule').set(authHeader(admin))
+      .send({ enabled: true, days: openAllWeek });
+    expect(res.status).toBe(200);
+    expect(res.body.desiredNow).toBe(true);
+    expect((await request(app).get('/api/chat/presence')).body.available).toBe(true);
+
+    await request(app).put('/api/chat/admin/schedule').set(authHeader(admin))
+      .send({ enabled: true, days: closedAllWeek });
+    expect((await request(app).get('/api/chat/presence')).body.available).toBe(false);
+  });
+
+  it('a manual toggle while the schedule is on snapshots an override; saving clears it', async () => {
+    await request(app).put('/api/chat/admin/schedule').set(authHeader(admin))
+      .send({ enabled: true, days: openAllWeek });
+    // Manual tap to Away during an open window -> override recorded.
+    await setAvailable(false);
+    let sched = await request(app).get('/api/chat/admin/schedule').set(authHeader(admin));
+    expect(sched.body.overrideActive).toBe(true);
+    expect((await request(app).get('/api/chat/presence')).body.available).toBe(false);
+    // Re-saving the schedule clears the override and reconciles.
+    await request(app).put('/api/chat/admin/schedule').set(authHeader(admin))
+      .send({ enabled: true, days: openAllWeek });
+    sched = await request(app).get('/api/chat/admin/schedule').set(authHeader(admin));
+    expect(sched.body.overrideActive).toBe(false);
+    expect((await request(app).get('/api/chat/presence')).body.available).toBe(true);
+  });
+});
+
+describe('phone push', () => {
+  const subscription = {
+    endpoint: 'https://push.example.com/sub/abc',
+    keys: { p256dh: 'p256dh-key', auth: 'auth-key' },
+    userAgent: 'test-phone',
+  };
+
+  it('config exposes the VAPID public key to the authed console only', async () => {
+    expect((await request(app).get('/api/chat/admin/push/config')).status).toBe(401);
+    const res = await request(app).get('/api/chat/admin/push/config').set(authHeader(admin));
+    expect(res.status).toBe(200);
+    expect(typeof res.body.configured).toBe('boolean');
+  });
+
+  it('subscribe replaces every stored row (one phone), unsubscribe removes it', async () => {
+    await request(app).post('/api/chat/admin/push/subscribe').set(authHeader(admin)).send(subscription);
+    await request(app).post('/api/chat/admin/push/subscribe').set(authHeader(admin)).send({
+      ...subscription, endpoint: 'https://push.example.com/sub/def',
+    });
+    let { rows } = await query('SELECT endpoint FROM chat_push_subscriptions');
+    expect(rows).toHaveLength(1);
+    expect(rows[0].endpoint).toContain('/def');
+
+    await request(app).post('/api/chat/admin/push/unsubscribe').set(authHeader(admin))
+      .send({ endpoint: 'https://push.example.com/sub/def' });
+    ({ rows } = await query('SELECT endpoint FROM chat_push_subscriptions'));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('rejects malformed subscriptions', async () => {
+    const res = await request(app).post('/api/chat/admin/push/subscribe').set(authHeader(admin))
+      .send({ endpoint: 'http://not-https', keys: {} });
+    expect(res.status).toBe(400);
+  });
+
+  it('receipt route: a valid signed receipt stamps delivery; garbage is rejected', async () => {
+    const { createPushReceiptToken } = await import('../../server/lib/chat-push.js');
+    await setAvailable();
+    const sessionId = (await escalate(nextIp())).body.sessionId;
+    await request(app).post('/api/chat/admin/push/subscribe').set(authHeader(admin)).send(subscription);
+
+    const token = createPushReceiptToken(sessionId);
+    const ok = await request(app).post('/api/chat/push/receipt').send({ receipt: token });
+    expect(ok.status).toBe(200);
+    const { rows } = await query('SELECT push_delivered_at FROM chat_sessions WHERE id = $1', [sessionId]);
+    expect(Number(rows[0].push_delivered_at)).toBeGreaterThan(0);
+    const subRows = await query('SELECT last_delivered_at FROM chat_push_subscriptions');
+    expect(Number(subRows.rows[0].last_delivered_at)).toBeGreaterThan(0);
+
+    expect((await request(app).post('/api/chat/push/receipt').send({ receipt: 'garbage' })).status).toBe(400);
+    expect((await request(app).post('/api/chat/push/receipt').send({})).status).toBe(400);
+  });
+});
+
+describe('admin health + typing', () => {
+  it('health reports push, streams, sweep, and presence provenance', async () => {
+    await setAvailable();
+    const res = await request(app).get('/api/chat/admin/health').set(authHeader(admin));
+    expect(res.status).toBe(200);
+    expect(typeof res.body.now).toBe('number');
+    expect(res.body.subscribers).toEqual({ sessions: 0, admin: 0 });
+    expect(Array.isArray(res.body.push)).toBe(true);
+    expect(res.body.presence.available).toBe(true);
+  });
+
+  it('typing endpoint accepts an agent typing signal', async () => {
+    await setAvailable();
+    const sessionId = (await escalate(nextIp())).body.sessionId;
+    const res = await request(app).post(`/api/chat/admin/sessions/${sessionId}/typing`)
+      .set(authHeader(admin)).send({ typing: true });
+    expect(res.status).toBe(200);
+  });
+});
+
+describe('assistant settings overrides', () => {
+  it('round-trips overrides and feeds them into the system prompt', async () => {
+    const blank = await request(app).get('/api/chat/admin/assistant-settings').set(authHeader(admin));
+    expect(blank.body).toEqual({ profileOverride: '', guidelinesOverride: '' });
+
+    const put = await request(app).put('/api/chat/admin/assistant-settings').set(authHeader(admin))
+      .send({ profileOverride: 'OVERRIDE-PROFILE-MARKER: potluck every third Sunday' });
+    expect(put.status).toBe(200);
+    expect(put.body.profileOverride).toContain('OVERRIDE-PROFILE-MARKER');
+
+    const { buildSystemPrompt, clearContextCache } = await import('../../server/lib/assistant-context.js');
+    clearContextCache();
+    const prompt = await buildSystemPrompt();
+    expect(prompt).toContain('OVERRIDE-PROFILE-MARKER');
+    // Built-in profile replaced (J.O.Y. appears only in the profile; the
+    // guardrails — not overridden here — still mention the Eight Points).
+    expect(prompt).not.toContain('J.O.Y. Ladies Circle');
+
+    // Clearing restores the built-ins.
+    await request(app).put('/api/chat/admin/assistant-settings').set(authHeader(admin))
+      .send({ profileOverride: '' });
+    clearContextCache();
+    expect(await buildSystemPrompt()).toContain('J.O.Y. Ladies Circle');
+  });
+
+  it('rejects oversized or non-string overrides', async () => {
+    expect((await request(app).put('/api/chat/admin/assistant-settings').set(authHeader(admin))
+      .send({ profileOverride: 42 })).status).toBe(400);
+    expect((await request(app).put('/api/chat/admin/assistant-settings').set(authHeader(admin))
+      .send({ profileOverride: 'x'.repeat(60001) })).status).toBe(400);
   });
 });
 

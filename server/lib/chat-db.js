@@ -3,6 +3,7 @@
 // chat-bus.js. All timestamps are Unix milliseconds (house style).
 import crypto from 'crypto';
 import { query } from '../db.js';
+import { DEFAULT_DAYS, isValidDays } from './presence-schedule.js';
 
 /** Visitor routes answer 410 this long after a chat ends (leaked-id containment). */
 export const ENDED_GRACE_MS = 15 * 60 * 1000;
@@ -101,13 +102,103 @@ export async function getPresence() {
   return rows[0]?.available === true;
 }
 
-export async function setPresence(available, now = Date.now()) {
+export async function getPresenceRow() {
+  const { rows } = await query('SELECT available, updated_at, updated_from FROM chat_agent_presence WHERE id = 1');
+  return rows[0] || { available: false, updated_at: null, updated_from: null };
+}
+
+export async function setPresence(available, now = Date.now(), from = null) {
   await query(
-    `INSERT INTO chat_agent_presence (id, available, updated_at) VALUES (1, $1, $2)
-     ON CONFLICT (id) DO UPDATE SET available = $1, updated_at = $2`,
-    [!!available, now]
+    `INSERT INTO chat_agent_presence (id, available, updated_at, updated_from) VALUES (1, $1, $2, $3)
+     ON CONFLICT (id) DO UPDATE SET available = $1, updated_at = $2, updated_from = COALESCE($3, chat_agent_presence.updated_from)`,
+    [!!available, now, from]
   );
   return !!available;
+}
+
+// ------------------------------------------------- weekly presence schedule
+
+/** Serialize schedule reads/writes against the 60-s scheduler tick so a
+ *  manual tap can't be clobbered. Single process, so a promise chain is the
+ *  whole mutex. */
+let scheduleChain = Promise.resolve();
+export function runExclusive(fn) {
+  const run = scheduleChain.then(fn, fn);
+  scheduleChain = run.catch(() => {});
+  return run;
+}
+
+/** Always returns a usable shape; `daysValid` is false when the stored jsonb
+ *  was malformed (the scheduler then does nothing until re-saved). */
+export async function getPresenceSchedule() {
+  const { rows } = await query('SELECT enabled, days, override_desired FROM chat_presence_schedule WHERE id = 1');
+  if (!rows[0]) {
+    return { enabled: false, days: DEFAULT_DAYS, daysValid: true, overrideDesired: null };
+  }
+  const days = rows[0].days;
+  const daysValid = isValidDays(days);
+  return {
+    enabled: rows[0].enabled === true,
+    days: daysValid ? days : DEFAULT_DAYS,
+    daysValid,
+    overrideDesired: rows[0].override_desired === null ? null : rows[0].override_desired === true,
+  };
+}
+
+/** Saving a schedule clears any manual override (the admin just stated intent). */
+export async function setPresenceSchedule(enabled, days, now = Date.now()) {
+  await query(
+    `INSERT INTO chat_presence_schedule (id, enabled, days, override_desired, updated_at)
+     VALUES (1, $1, $2, NULL, $3)
+     ON CONFLICT (id) DO UPDATE SET enabled = $1, days = $2, override_desired = NULL, updated_at = $3`,
+    [!!enabled, JSON.stringify(days), now]
+  );
+}
+
+/** Snapshot of the scheduled state at a manual tap (null clears the override). */
+export async function setScheduleOverride(desired, now = Date.now()) {
+  await query(
+    `UPDATE chat_presence_schedule SET override_desired = $1, updated_at = $2 WHERE id = 1`,
+    [desired, now]
+  );
+}
+
+// ---------------------------------------------------------- push subscriptions
+
+export async function listPushSubscriptions() {
+  const { rows } = await query(
+    'SELECT id, endpoint, p256dh, auth, user_agent, created_at, last_success_at, last_delivered_at, failures FROM chat_push_subscriptions ORDER BY id'
+  );
+  return rows;
+}
+
+/** One phone: subscribing replaces every stored row (reference behavior). */
+export async function replacePushSubscriptions({ endpoint, p256dh, auth, userAgent }, now = Date.now()) {
+  await query('DELETE FROM chat_push_subscriptions');
+  await query(
+    `INSERT INTO chat_push_subscriptions (endpoint, p256dh, auth, user_agent, created_at) VALUES ($1, $2, $3, $4, $5)`,
+    [endpoint, p256dh, auth, userAgent || null, now]
+  );
+}
+
+export async function deletePushSubscription(endpoint) {
+  await query('DELETE FROM chat_push_subscriptions WHERE endpoint = $1', [endpoint]);
+}
+
+export async function recordPushResult(endpoint, success, now = Date.now()) {
+  if (success) {
+    await query('UPDATE chat_push_subscriptions SET last_success_at = $2, failures = 0 WHERE endpoint = $1', [endpoint, now]);
+  } else {
+    await query('UPDATE chat_push_subscriptions SET failures = failures + 1 WHERE endpoint = $1', [endpoint]);
+  }
+}
+
+/** A verified receipt: the notification was SHOWN on the phone. */
+export async function markPushDelivered(sessionId, now = Date.now()) {
+  await query('UPDATE chat_push_subscriptions SET last_delivered_at = $1', [now]);
+  if (sessionId && sessionId !== 'test') {
+    await query('UPDATE chat_sessions SET push_delivered_at = $1 WHERE id = $2', [now, sessionId]);
+  }
 }
 
 // ---------------------------------------------------------------- sweeps

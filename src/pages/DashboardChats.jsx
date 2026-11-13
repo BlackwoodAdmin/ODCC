@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import api from '../services/api';
 import useNotification from '../hooks/useNotification';
 import { formatDateTime } from '../utils/formatters';
+import { useHealth, HealthStrip, PushControls, ScheduleControls, AssistantSettings } from '../components/chat/ConsoleControls';
 
 // Live chat console. The event stream authenticates with a 60-second ticket
 // minted by a Bearer-authed call — EventSource cannot send headers, and the
@@ -49,8 +50,40 @@ export default function DashboardChats() {
   const selectedIdRef = useRef(null);
   const attentionRef = useRef(false);
   const flashRef = useRef(null);
+  const typingRef = useRef({ active: false, idleTimer: null });
+  const { health, reload: reloadHealth } = useHealth();
 
   selectedIdRef.current = selectedId;
+
+  // Agent typing indicator: fire once when typing starts, clear after 2.5 s
+  // idle or on send. Best-effort (no await, no error surface).
+  const emitTyping = useCallback((typing) => {
+    if (!selectedIdRef.current) return;
+    api.post(`/chat/admin/sessions/${selectedIdRef.current}/typing`, { typing }).catch(() => {});
+  }, []);
+  const noteTyping = useCallback(() => {
+    const t = typingRef.current;
+    if (!t.active) {
+      t.active = true;
+      emitTyping(true);
+    }
+    if (t.idleTimer) clearTimeout(t.idleTimer);
+    t.idleTimer = setTimeout(() => {
+      t.active = false;
+      emitTyping(false);
+    }, 2500);
+  }, [emitTyping]);
+  const stopTyping = useCallback(() => {
+    const t = typingRef.current;
+    if (t.idleTimer) clearTimeout(t.idleTimer);
+    if (t.active) {
+      t.active = false;
+      emitTyping(false);
+    }
+  }, [emitTyping]);
+  useEffect(() => () => {
+    if (typingRef.current.idleTimer) clearTimeout(typingRef.current.idleTimer);
+  }, []);
 
   // ---- attention: tab title flash until the admin interacts
   const requestAttention = useCallback(() => {
@@ -207,6 +240,7 @@ export default function DashboardChats() {
     const text = reply.trim();
     if (!text || !selectedId) return;
     setReply('');
+    stopTyping();
     try {
       await api.post(`/chat/admin/sessions/${selectedId}/messages`, { content: text });
     } catch (err) {
@@ -248,6 +282,7 @@ export default function DashboardChats() {
             Visitors can't start a live chat while you're Away — the assistant offers the contact form instead. Toggle Available when you can answer.
           </p>
         )}
+        <HealthStrip health={health} streamUp={streamUp} />
 
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Session list */}
@@ -332,7 +367,7 @@ export default function DashboardChats() {
                     <input
                       type="text"
                       value={reply}
-                      onChange={(e) => setReply(e.target.value)}
+                      onChange={(e) => { setReply(e.target.value); noteTyping(); }}
                       placeholder="Type your reply…"
                       maxLength={4000}
                       className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:border-sage"
@@ -346,6 +381,15 @@ export default function DashboardChats() {
               </>
             )}
           </div>
+        </div>
+
+        {/* Settings: phone alerts, weekly schedule, assistant knowledge */}
+        <div className="grid lg:grid-cols-2 gap-6 mt-6">
+          <div className="space-y-6">
+            <PushControls onChanged={reloadHealth} />
+            <AssistantSettings />
+          </div>
+          <ScheduleControls onSaved={() => { reloadHealth(); refreshSessions(); }} />
         </div>
       </div>
     </div>

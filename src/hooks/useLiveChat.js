@@ -52,6 +52,7 @@ export function useLiveChat(options) {
     endReason: state.endReason,
     messages: state.messages,
     isAgentAvailable: state.isAgentAvailable,
+    isAgentTyping: state.isAgentTyping,
     isEscalationRequest,
     startEscalation,
     resume,

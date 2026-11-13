@@ -116,6 +116,19 @@ export function publishSessionCreated(session) {
   broadcast(adminStreams, 'session-created', session);
 }
 
+/** Agent typing: that session's visitor streams only (visitor typing is not relayed). */
+export function publishTyping(sessionId, typing) {
+  const set = visitorStreams.get(sessionId);
+  if (set) broadcast(set, 'typing', { sessionId, typing: !!typing });
+}
+
+/** Stream counts for the console health strip. */
+export function streamCounts() {
+  let sessions = 0;
+  for (const set of visitorStreams.values()) sessions += set.size;
+  return { sessions, admin: adminStreams.size };
+}
+
 /** Presence toggle: everyone — visitors update their "talk to a person" UI. */
 export function publishPresence(available) {
   const payload = { available };

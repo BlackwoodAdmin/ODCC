@@ -320,6 +320,24 @@ export async function initializeDatabase() {
       available BOOLEAN NOT NULL DEFAULT FALSE,
       updated_at BIGINT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS chat_presence_schedule (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      days JSONB NOT NULL,
+      override_desired BOOLEAN,
+      updated_at BIGINT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS chat_push_subscriptions (
+      id SERIAL PRIMARY KEY,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth TEXT NOT NULL,
+      user_agent TEXT,
+      created_at BIGINT NOT NULL,
+      last_success_at BIGINT,
+      last_delivered_at BIGINT,
+      failures INTEGER NOT NULL DEFAULT 0
+    );
   `);
   await pool.query(
     `INSERT INTO chat_agent_presence (id, available, updated_at) VALUES (1, FALSE, $1) ON CONFLICT (id) DO NOTHING`,
@@ -384,6 +402,12 @@ export async function initializeDatabase() {
     if (!e.message.includes('already exists')) throw e;
   }
   try { await pool.query("ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS type VARCHAR(20) DEFAULT 'contact'"); } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+  }
+  try { await pool.query('ALTER TABLE chat_sessions ADD COLUMN IF NOT EXISTS push_delivered_at BIGINT'); } catch (e) {
+    if (!e.message.includes('already exists')) throw e;
+  }
+  try { await pool.query('ALTER TABLE chat_agent_presence ADD COLUMN IF NOT EXISTS updated_from VARCHAR(64)'); } catch (e) {
     if (!e.message.includes('already exists')) throw e;
   }
   try { await pool.query('ALTER TABLE contact_submissions ADD COLUMN IF NOT EXISTS visit_date VARCHAR(20)'); } catch (e) {

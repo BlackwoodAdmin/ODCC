@@ -5,6 +5,7 @@
 import { CHURCH_PROFILE } from './church-profile.js';
 import { getPublicEvents, getPublishedPosts } from './page-data.js';
 import { getPresence } from './chat-db.js';
+import { query } from '../db.js';
 
 const GUARDRAILS = `
 ## Who you are and how you behave
@@ -24,6 +25,46 @@ Rules you never break:
 - If the visitor asks to talk to a human, tell them they can use the "Talk to a person" option in this chat, and that if no one is available the contact form reaches the church directly.`;
 
 let cache = { block: null, expiresAt: 0 };
+
+// ---------------------------------------------------------------- overrides
+// Admin-editable overrides (site_settings row) for the knowledge profile and
+// the guidelines — the church can correct a fact or tune the assistant's
+// behavior from the dashboard, no deploy needed. Blank = use the built-in.
+const OVERRIDES_KEY = 'assistant_overrides';
+let overridesCache = { value: null, expiresAt: 0 };
+
+export async function getAssistantOverrides() {
+  const now = Date.now();
+  if (overridesCache.value && now < overridesCache.expiresAt) return overridesCache.value;
+  let value = { profileOverride: '', guidelinesOverride: '' };
+  try {
+    const { rows } = await query('SELECT value FROM site_settings WHERE key = $1', [OVERRIDES_KEY]);
+    if (rows[0]?.value) {
+      value = {
+        profileOverride: typeof rows[0].value.profileOverride === 'string' ? rows[0].value.profileOverride : '',
+        guidelinesOverride: typeof rows[0].value.guidelinesOverride === 'string' ? rows[0].value.guidelinesOverride : '',
+      };
+    }
+  } catch { /* table missing or unreadable: run on built-ins */ }
+  overridesCache = { value, expiresAt: now + 60 * 1000 };
+  return value;
+}
+
+export async function setAssistantOverrides({ profileOverride, guidelinesOverride }) {
+  const current = await getAssistantOverrides();
+  const next = {
+    profileOverride: profileOverride !== undefined ? profileOverride : current.profileOverride,
+    guidelinesOverride: guidelinesOverride !== undefined ? guidelinesOverride : current.guidelinesOverride,
+  };
+  await query(
+    `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, $3)
+     ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = $3`,
+    [OVERRIDES_KEY, JSON.stringify(next), Date.now()]
+  );
+  overridesCache = { value: next, expiresAt: Date.now() + 60 * 1000 };
+  cache = { block: null, expiresAt: 0 };
+  return next;
+}
 
 function fmtEventDate(dateStr) {
   const [y, m, d] = String(dateStr).split('-').map(Number);
@@ -86,15 +127,20 @@ ${eventsBlock}
 ${postsBlock ? `\n### Recent blog posts\n${postsBlock}` : ''}`;
 }
 
-/** Full system prompt. Live block cached 60 s; profile + guardrails are static. */
+/** Full system prompt. Live block cached 60 s; profile/guardrails come from
+ *  the built-ins unless an admin override is set. */
 export async function buildSystemPrompt() {
   const now = Date.now();
   if (!cache.block || now > cache.expiresAt) {
     cache = { block: await buildLiveBlock(), expiresAt: now + 60 * 1000 };
   }
-  return `${GUARDRAILS}\n${CHURCH_PROFILE}\n${cache.block}`;
+  const overrides = await getAssistantOverrides();
+  const guardrails = overrides.guidelinesOverride.trim() ? overrides.guidelinesOverride : GUARDRAILS;
+  const profile = overrides.profileOverride.trim() ? overrides.profileOverride : CHURCH_PROFILE;
+  return `${guardrails}\n${profile}\n${cache.block}`;
 }
 
 export function clearContextCache() {
   cache = { block: null, expiresAt: 0 };
+  overridesCache = { value: null, expiresAt: 0 };
 }

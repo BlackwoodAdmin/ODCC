@@ -11,12 +11,23 @@ import { verifyTurnstile } from '../middleware/turnstile.js';
 import {
   createChatSession, getChatSession, getChatMessages, addChatMessage,
   claimChatSession, endChatSession, listAdminSessions,
-  getPresence, setPresence, isChatSessionGone, sanitizeChatText,
+  getPresence, getPresenceRow, setPresence, isChatSessionGone, sanitizeChatText,
+  getPresenceSchedule, setPresenceSchedule, setScheduleOverride, runExclusive,
+  listPushSubscriptions, replacePushSubscriptions, deletePushSubscription, markPushDelivered,
 } from '../lib/chat-db.js';
 import {
   openSseStream, writeEvent, addVisitorStream, addAdminStream,
   publishMessage, publishStatus, publishSessionCreated, publishPresence,
+  publishTyping, streamCounts,
 } from '../lib/chat-bus.js';
+import {
+  SCHEDULE_TIMEZONE, isValidDays, computeScheduledAvailability,
+} from '../lib/presence-schedule.js';
+import {
+  isPushConfigured, sendNewChatPush, verifyPushReceiptToken,
+} from '../lib/chat-push.js';
+import { getLastSweep } from '../cron/chat-maintenance.js';
+import { getAssistantOverrides, setAssistantOverrides } from '../lib/assistant-context.js';
 import {
   createToken, verifyToken,
   CHAT_SESSION_PURPOSE, ADMIN_STREAM_PURPOSE,
@@ -119,8 +130,11 @@ router.post('/escalate', async (req, res) => {
       chatHistory: history,
     });
     publishSessionCreated(session);
-    // Nothing else happens here: the maintenance cron's
-    // `waiting AND fallback_email_at IS NULL` filter IS the fallback-email queue.
+    // The fallback-email "queue" is the cron's `waiting AND fallback_email_at
+    // IS NULL` filter; the phone alert goes out now, off the response path.
+    sendNewChatPush(session.id, session.page_url || '/').catch((err) => {
+      console.error('[Chat] escalate push failed:', err.message || err);
+    });
 
     res.status(201).json({ sessionId: session.id, status: 'waiting' });
   } catch (err) {
@@ -222,6 +236,24 @@ router.post('/session/:id/messages', async (req, res) => {
     res.status(201).json({ success: true, id: message.id });
   } catch {
     res.status(500).json({ error: 'Failed to send message' });
+  }
+});
+
+// POST /api/chat/push/receipt — PUBLIC, rate-limited: the service worker
+// echoes the signed receipt token after it SHOWS a notification. A valid
+// token proves the alert reached the phone (a push-service 201 only means
+// "queued"). The token is minted by us and HMAC-verified, so no auth needed.
+router.post('/push/receipt', async (req, res) => {
+  try {
+    if (rateLimited('push-receipt', req.ip, 30, 60 * 1000)) {
+      return res.status(429).json({ error: 'Too many receipts' });
+    }
+    const verified = verifyPushReceiptToken(req.body?.receipt);
+    if (!verified) return res.status(400).json({ error: 'Invalid receipt' });
+    await markPushDelivered(verified.sessionId);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Failed to record receipt' });
   }
 });
 
@@ -332,13 +364,189 @@ router.post('/admin/sessions/:id/end', ...admin, async (req, res) => {
   }
 });
 
+// Manual toggle. When the schedule is enabled, snapshot the CURRENT scheduled
+// state as the override so this tap holds until the next scheduled boundary
+// (manual-wins-until-next-boundary), then the schedule resumes. Serialized
+// with the scheduler tick so the tap can't be clobbered.
 router.put('/admin/presence', ...admin, async (req, res) => {
   try {
-    const available = await setPresence(req.body?.available === true);
+    const available = await runExclusive(async () => {
+      const value = await setPresence(req.body?.available === true, Date.now(), req.ip);
+      try {
+        const schedule = await getPresenceSchedule();
+        if (schedule.enabled && schedule.daysValid) {
+          await setScheduleOverride(computeScheduledAvailability(schedule.days, Date.now()));
+        }
+      } catch (err) {
+        console.error('[Chat] override snapshot failed:', err.message);
+      }
+      return value;
+    });
+    console.log(`[Chat] presence available=${available} ip=${req.ip}`);
     publishPresence(available);
     res.json({ success: true, available });
   } catch {
     res.status(500).json({ error: 'Failed to update availability' });
+  }
+});
+
+// ------------------------------------------------- weekly schedule (admin)
+
+function serializeSchedule(schedule) {
+  return {
+    enabled: schedule.enabled,
+    timezone: SCHEDULE_TIMEZONE,
+    days: schedule.days,
+    daysValid: schedule.daysValid,
+    overrideActive: schedule.overrideDesired !== null,
+    desiredNow: computeScheduledAvailability(schedule.days, Date.now()),
+  };
+}
+
+router.get('/admin/schedule', ...admin, async (_req, res) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json(serializeSchedule(await getPresenceSchedule()));
+  } catch {
+    res.status(500).json({ error: 'Failed to read schedule' });
+  }
+});
+
+// Saving clears any manual override and immediately reconciles presence.
+// The timezone is fixed in code (Eastern) and not accepted from the client.
+router.put('/admin/schedule', ...admin, async (req, res) => {
+  try {
+    const { enabled, days } = req.body || {};
+    if (typeof enabled !== 'boolean' || !isValidDays(days)) {
+      return res.status(400).json({ error: 'Invalid schedule: 7 days, HH:MM times, open before close' });
+    }
+    const schedule = await runExclusive(async () => {
+      await setPresenceSchedule(enabled, days);
+      if (enabled) {
+        const desired = computeScheduledAvailability(days, Date.now());
+        if (desired !== (await getPresence())) {
+          await setPresence(desired, Date.now(), 'schedule');
+          publishPresence(desired);
+        }
+      }
+      return getPresenceSchedule();
+    });
+    console.log(`[Chat] schedule saved enabled=${enabled} ip=${req.ip}`);
+    res.json(serializeSchedule(schedule));
+  } catch {
+    res.status(500).json({ error: 'Failed to save schedule' });
+  }
+});
+
+// ------------------------------------------------- agent typing (admin)
+
+router.post('/admin/sessions/:id/typing', ...admin, async (req, res) => {
+  try {
+    publishTyping(req.params.id, req.body?.typing === true);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Failed' });
+  }
+});
+
+// ------------------------------------------------- phone push (admin)
+
+// The VAPID public key, fetched at runtime (not baked into the bundle).
+router.get('/admin/push/config', ...admin, (_req, res) => {
+  res.json({ configured: isPushConfigured(), publicKey: process.env.VAPID_PUBLIC_KEY || null });
+});
+
+// One phone: subscribing replaces every stored row.
+router.post('/admin/push/subscribe', ...admin, async (req, res) => {
+  try {
+    const { endpoint, keys, userAgent } = req.body || {};
+    if (typeof endpoint !== 'string' || !endpoint.startsWith('https://') || endpoint.length > 1024 ||
+        typeof keys?.p256dh !== 'string' || typeof keys?.auth !== 'string') {
+      return res.status(400).json({ error: 'Invalid subscription' });
+    }
+    await replacePushSubscriptions({
+      endpoint, p256dh: keys.p256dh, auth: keys.auth,
+      userAgent: sanitizeChatText(userAgent || '', 256) || null,
+    });
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Failed to save subscription' });
+  }
+});
+
+router.post('/admin/push/unsubscribe', ...admin, async (req, res) => {
+  try {
+    if (typeof req.body?.endpoint === 'string') await deletePushSubscription(req.body.endpoint);
+    res.json({ success: true });
+  } catch {
+    res.status(500).json({ error: 'Failed to remove subscription' });
+  }
+});
+
+router.post('/admin/push/test', ...admin, async (_req, res) => {
+  try {
+    const result = await sendNewChatPush('test', '/dashboard/chats');
+    res.json({ result });
+  } catch {
+    res.status(500).json({ error: 'Test push failed' });
+  }
+});
+
+// ------------------------------------------------- health (admin)
+
+router.get('/admin/health', ...admin, async (_req, res) => {
+  try {
+    const [push, presence] = await Promise.all([listPushSubscriptions(), getPresenceRow()]);
+    res.set('Cache-Control', 'no-store');
+    res.json({
+      now: Date.now(),
+      pushConfigured: isPushConfigured(),
+      subscribers: streamCounts(),
+      sweep: getLastSweep(),
+      push: push.map((p) => ({
+        id: p.id,
+        endpointHost: (() => { try { return new URL(p.endpoint).host; } catch { return 'invalid'; } })(),
+        createdAt: Number(p.created_at),
+        lastSuccessAt: p.last_success_at === null ? null : Number(p.last_success_at),
+        lastDeliveredAt: p.last_delivered_at === null ? null : Number(p.last_delivered_at),
+        failures: p.failures,
+      })),
+      presence: {
+        available: presence.available === true,
+        updatedAt: presence.updated_at === null ? null : Number(presence.updated_at),
+        updatedFrom: presence.updated_from,
+      },
+    });
+  } catch {
+    res.status(500).json({ error: 'Failed to read health' });
+  }
+});
+
+// ------------------------------------------------- assistant settings (admin)
+
+// DB overrides for the assistant's knowledge profile and guidelines — edits
+// take effect within a minute, no deploy needed. Blank string = use built-in.
+router.get('/admin/assistant-settings', ...admin, async (_req, res) => {
+  try {
+    res.json(await getAssistantOverrides());
+  } catch {
+    res.status(500).json({ error: 'Failed to read assistant settings' });
+  }
+});
+
+router.put('/admin/assistant-settings', ...admin, async (req, res) => {
+  try {
+    const { profileOverride, guidelinesOverride } = req.body || {};
+    if ((profileOverride !== undefined && typeof profileOverride !== 'string') ||
+        (guidelinesOverride !== undefined && typeof guidelinesOverride !== 'string') ||
+        (profileOverride || '').length > 60000 || (guidelinesOverride || '').length > 20000) {
+      return res.status(400).json({ error: 'Invalid settings' });
+    }
+    await setAssistantOverrides({ profileOverride, guidelinesOverride });
+    console.log(`[Chat] assistant settings saved ip=${req.ip}`);
+    res.json(await getAssistantOverrides());
+  } catch {
+    res.status(500).json({ error: 'Failed to save assistant settings' });
   }
 });
 

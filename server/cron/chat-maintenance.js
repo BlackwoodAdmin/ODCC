@@ -13,9 +13,38 @@ import { sendEmail, escapeHtml } from '../email.js';
 import {
   findFallbackEmailCandidates, markFallbackEmailSent,
   endStaleWaitingSessions, endIdleConnectedSessions, purgeOldSessions,
-  getChatMessages,
+  getChatMessages, getPresence, getPresenceSchedule, setPresence,
+  setScheduleOverride, runExclusive,
 } from '../lib/chat-db.js';
-import { publishStatus } from '../lib/chat-bus.js';
+import { publishStatus, publishPresence } from '../lib/chat-bus.js';
+import { decideScheduleAction } from '../lib/presence-schedule.js';
+
+// Last sweep stats, read by the console health strip.
+let lastSweep = null;
+export function getLastSweep() {
+  return lastSweep;
+}
+
+// 60-s scheduler tick: apply the weekly schedule (and resume from a manual
+// override at the next scheduled boundary). Serialized with the presence and
+// schedule routes via runExclusive so a manual tap can't be clobbered.
+async function scheduleTick() {
+  try {
+    await runExclusive(async () => {
+      const schedule = await getPresenceSchedule();
+      const current = await getPresence();
+      const action = decideScheduleAction(schedule, current, Date.now());
+      if (action.apply !== undefined) {
+        await setPresence(action.apply, Date.now(), 'schedule');
+        publishPresence(action.apply);
+        console.log(`[ChatCron] schedule applied available=${action.apply}${action.clearOverride ? ' (override resumed)' : ''}`);
+      }
+      if (action.clearOverride) await setScheduleOverride(null);
+    });
+  } catch (err) {
+    console.error('[ChatCron] schedule tick failed:', err.message);
+  }
+}
 
 const FALLBACK_TO = process.env.CHAT_FALLBACK_EMAIL || 'hello@opendoorchristian.church';
 const SITE_URL = process.env.SITE_URL || 'https://opendoorchristian.church';
@@ -83,10 +112,12 @@ async function minuteTick() {
 
 async function tenMinuteTick() {
   try {
-    for (const id of await endIdleConnectedSessions()) {
+    const ended = await endIdleConnectedSessions();
+    for (const id of ended) {
       publishStatus(id, 'ended', 'timeout');
     }
     const purged = await purgeOldSessions();
+    lastSweep = { ranAt: Date.now(), ended: ended.length, purged };
     if (purged > 0) console.log(`[ChatCron] purged ${purged} chat session(s) past retention`);
   } catch (err) {
     console.error('[ChatCron] sweep failed:', err.message);
@@ -94,7 +125,7 @@ async function tenMinuteTick() {
 }
 
 export function initChatMaintenance() {
-  setInterval(minuteTick, 60 * 1000);
+  setInterval(() => { minuteTick(); scheduleTick(); }, 60 * 1000);
   setInterval(tenMinuteTick, 10 * 60 * 1000);
   console.log('[ChatCron] Live chat maintenance started');
 }
