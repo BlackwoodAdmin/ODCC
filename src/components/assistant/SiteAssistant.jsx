@@ -127,6 +127,14 @@ export default function SiteAssistant() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Anything on the site (the header's Chat link) can open the widget by
+  // dispatching this event — no prop plumbing across layout components.
+  useEffect(() => {
+    const open = () => setIsOpen(true);
+    window.addEventListener('odcc:open-assistant', open);
+    return () => window.removeEventListener('odcc:open-assistant', open);
+  }, []);
+
   // ---- persistence
   useEffect(() => { if (mounted) store(KEYS.MESSAGES, messages.slice(-50)); }, [messages, mounted]);
   useEffect(() => { if (mounted) store(KEYS.TOKEN, chatSessionToken); }, [chatSessionToken, mounted]);

@@ -108,6 +108,15 @@ export default function Header() {
                 )}
               </div>
 
+              {!location.pathname.startsWith('/dashboard') && (
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('odcc:open-assistant'))}
+                  className="font-medium transition-colors duration-200 text-charcoal hover:text-sage"
+                >
+                  Chat
+                </button>
+              )}
+
               <NavLink
                 to="/new-here"
                 className={({ isActive }) => `text-sm font-semibold px-4 py-2 rounded-full shadow-sm transition-all duration-200 ${isActive ? 'bg-earth text-white' : 'bg-earth text-white hover:opacity-90 hover:shadow-md'}`}
@@ -145,6 +154,14 @@ export default function Header() {
                 >
                   👋 I'm New — Plan a Visit
                 </NavLink>
+                {!location.pathname.startsWith('/dashboard') && (
+                  <button
+                    onClick={() => { setMobileOpen(false); window.dispatchEvent(new CustomEvent('odcc:open-assistant')); }}
+                    className="font-medium transition-colors duration-200 text-charcoal hover:text-sage"
+                  >
+                    💬 Chat
+                  </button>
+                )}
                 {navLinks.map(link => (
                   <NavLink key={link.to} to={link.to} className={linkClass} onClick={() => setMobileOpen(false)} end={link.to === '/'}>{link.label}</NavLink>
                 ))}
