@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import Turnstile from '../common/Turnstile';
 import useLiveChat from '../../hooks/useLiveChat';
 // Single source of truth with the server's deterministic crisis layer: used
@@ -417,6 +417,55 @@ export default function SiteAssistant() {
   );
 }
 
+// ---- message rendering: markdown links + bare site paths become tappable.
+// Only site-relative ("/contact", never "//host") and http(s) hrefs are
+// rendered as links; anything else stays literal text.
+const MD_LINK_RE = /\[([^\]]+)\]\(([^)\s]+)\)/g;
+const BARE_PATH_RE = /(\/(?:contact|give|new-here|services|events|blog|about|our-pastor|joy-ladies-circle)(?:\/[\w-]+)?)/g;
+
+function isSafeHref(href) {
+  return (/^\/(?!\/)/.test(href)) || (/^https?:\/\//i.test(href));
+}
+
+function linkifyPlain(text, keyBase) {
+  const parts = [];
+  let last = 0;
+  let i = 0;
+  let m;
+  BARE_PATH_RE.lastIndex = 0;
+  while ((m = BARE_PATH_RE.exec(text))) {
+    if (m.index > last) parts.push(text.slice(last, m.index));
+    parts.push(<Link key={`${keyBase}-b${i++}`} to={m[1]} className="underline font-medium">{m[1]}</Link>);
+    last = m.index + m[1].length;
+  }
+  if (last < text.length) parts.push(text.slice(last));
+  return parts;
+}
+
+function renderMessageContent(content) {
+  const text = String(content ?? '');
+  const nodes = [];
+  let last = 0;
+  let i = 0;
+  let m;
+  MD_LINK_RE.lastIndex = 0;
+  while ((m = MD_LINK_RE.exec(text))) {
+    if (m.index > last) nodes.push(...linkifyPlain(text.slice(last, m.index), `t${i}`));
+    const [whole, label, href] = m;
+    if (!isSafeHref(href)) {
+      nodes.push(whole);
+    } else if (href.startsWith('/')) {
+      nodes.push(<Link key={`l${i}`} to={href} className="underline font-medium">{label}</Link>);
+    } else {
+      nodes.push(<a key={`l${i}`} href={href} target="_blank" rel="noopener noreferrer" className="underline font-medium">{label}</a>);
+    }
+    last = m.index + whole.length;
+    i++;
+  }
+  if (last < text.length) nodes.push(...linkifyPlain(text.slice(last), 'tend'));
+  return nodes;
+}
+
 function MessageBubble({ role, content, crisis }) {
   if (role === 'info') {
     return <p className="text-center text-xs text-gray-500 px-4">{content}</p>;
@@ -431,7 +480,7 @@ function MessageBubble({ role, content, crisis }) {
           : 'bg-white text-charcoal rounded-bl-sm'
       }`}>
         {role === 'agent' && <p className="text-[10px] font-semibold text-earth mb-0.5">Open Door</p>}
-        {content}
+        {isUser ? content : renderMessageContent(content)}
       </div>
     </div>
   );
